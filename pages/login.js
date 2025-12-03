@@ -75,9 +75,6 @@ const LoginPage = () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          scopes: 'https://www.googleapis.com/auth/youtube.readonly'
-        }
       });
       if (error) throw error;
     } catch (err) {

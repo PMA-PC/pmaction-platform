@@ -88,7 +88,7 @@ const SlotColumn = ({ words, finalWord, delay, onComplete, columnIndex }) => {
 
             <div className={`bg-white border-4 rounded-xl p-4 md:p-6 w-36 md:w-48 h-24 md:h-32 flex items-center justify-center shadow-lg overflow-hidden relative transition-all duration-300 ${showGlow && !isSpinning
                 ? 'border-pink-500 shadow-2xl shadow-pink-500/60 ring-4 ring-purple-400/50'
-                : 'border-teal-500'
+                : 'border-pink-400'
                 }`}>
                 <div className="absolute inset-0 bg-gradient-to-b from-gray-100 via-transparent to-gray-100 pointer-events-none z-10"></div>
                 {showGlow && !isSpinning && (
@@ -111,9 +111,7 @@ const SlotColumn = ({ words, finalWord, delay, onComplete, columnIndex }) => {
                         }}
                         className={`text-2xl md:text-3xl font-extrabold ${isSpinning
                             ? 'text-gray-400'
-                            : showGlow
-                                ? 'bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent'
-                                : 'bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent'
+                            : 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent'
                             }`}
                     >
                         {words[currentIndex]}

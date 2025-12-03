@@ -17,17 +17,17 @@ const Home = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-teal-50 via-white to-purple-50 p-4">
       <main className="text-center p-8 md:p-12 bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl max-w-4xl w-full border border-white/50">
         {/* Main heading */}
-        <h1 className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-teal-800 mb-6 leading-tight drop-shadow-sm">
+        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800 mb-6 leading-tight drop-shadow-sm">
           Welcome to PMAction.com
-          <span className="block text-2xl md:text-3xl mt-2 font-bold text-gray-600">
+          <span className="block text-2xl md:text-3xl mt-2 font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
             Your personalized journey to Positive Mental Wellness.
           </span>
         </h1>
 
         {/* Taglines */}
-        <div className="mb-10 space-y-3">
+        <div className="mb-10 space-y-4">
           <motion.p
-            className="text-2xl md:text-3xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
+            className="text-3xl md:text-4xl font-black bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent drop-shadow-sm"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
@@ -35,7 +35,7 @@ const Home = () => {
             Be Awesome @ Today
           </motion.p>
           <motion.p
-            className="text-xl md:text-2xl font-medium text-gray-500 italic"
+            className="text-xl md:text-2xl font-bold text-gray-600 italic"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
@@ -62,7 +62,7 @@ const Home = () => {
             }}
             className="my-8"
           >
-            <h3 className="text-3xl md:text-4xl font-black text-teal-600 mb-2">
+            <h3 className="text-3xl md:text-4xl font-black text-pink-600 mb-2">
               WINNER'S WIN!
             </h3>
             <p className="text-purple-600 font-bold text-lg">You're ready to start.</p>
@@ -72,7 +72,7 @@ const Home = () => {
         <div className="flex justify-center mt-8 mb-12">
           <Link
             href="/onboarding/goals"
-            className={`px-8 py-4 bg-gradient-to-r from-teal-600 to-teal-500 text-white text-lg font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 ${pulseButton ? 'animate-pulse ring-4 ring-teal-200' : ''}`}
+            className={`px-10 py-5 bg-gradient-to-r from-pink-500 to-purple-600 text-white text-2xl font-black rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 animate-pulse ${pulseButton ? 'ring-4 ring-pink-300' : ''}`}
           >
             Start Your Journey ➜
           </Link>
@@ -82,8 +82,8 @@ const Home = () => {
           <p className="text-gray-600 text-lg mb-4 font-medium max-w-2xl mx-auto leading-relaxed">
             Your trusted source to help you build a happy life :)
           </p>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-teal-700 mt-4 leading-tight">
-            One <span className="text-purple-600">Action</span> at a Time.
+          <h2 className="text-3xl md:text-4xl font-extrabold text-gray-700 mt-4 leading-tight">
+            One <span className="text-pink-600">Action</span> at a Time.
           </h2>
         </div>
       </main>

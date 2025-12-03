@@ -105,14 +105,35 @@ export default function NotificationManager() {
                     </div>
 
                     {settings.dailyReminder && (
-                        <div className="ml-8 bg-gray-50 p-4 rounded-xl border border-gray-100 animate-fade-in-up">
-                            <label className="block text-sm font-bold text-gray-700 mb-2">Reminder Time</label>
-                            <input
-                                type="time"
-                                value={settings.reminderTime}
-                                onChange={(e) => updateSetting('reminderTime', e.target.value)}
-                                className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
+                        <div className="ml-8 space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-100 animate-fade-in-up">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Reminder Time</label>
+                                <input
+                                    type="time"
+                                    value={settings.reminderTime}
+                                    onChange={(e) => updateSetting('reminderTime', e.target.value)}
+                                    className="p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xl">📲</span>
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-700">Multiple Nudges</p>
+                                        <p className="text-xs text-gray-500">Get extra bumps if you miss a check-in</p>
+                                    </div>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.multipleNudges || false}
+                                        onChange={(e) => updateSetting('multipleNudges', e.target.checked)}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
+                                </label>
+                            </div>
                         </div>
                     )}
 

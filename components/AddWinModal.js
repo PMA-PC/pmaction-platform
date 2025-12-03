@@ -9,14 +9,14 @@ const WIN_TYPES = {
 };
 
 const ACTIVITIES = [
-    { id: 'water', label: 'Drank Water', icon: '💧', xp: 10 },
-    { id: 'gym', label: 'Went to Gym', icon: '🏋️', xp: 10 },
-    { id: 'walk', label: 'Took a Walk', icon: '🚶', xp: 10 },
-    { id: 'healthy_meal', label: 'Healthy Meal', icon: '🥗', xp: 10 },
-    { id: 'meds', label: 'Took Meds', icon: '💊', xp: 10 },
-    { id: 'read', label: 'Read', icon: '📖', xp: 10 },
-    { id: 'clean', label: 'Cleaned', icon: '🧹', xp: 10 },
-    { id: 'sleep', label: 'Good Sleep', icon: '😴', xp: 10 }
+    { id: 'water', label: 'Drank Water', icon: '💧', xp: 10, benefit: 'Great job! Hydration improves focus and reduces anxiety.' },
+    { id: 'gym', label: 'Went to Gym', icon: '🏋️', xp: 10, benefit: 'Virtual high five! Exercise releases endorphins and fights depression.' },
+    { id: 'walk', label: 'Took a Walk', icon: '🚶', xp: 10, benefit: 'Way to go! Movement clears the mind and boosts energy.' },
+    { id: 'healthy_meal', label: 'Healthy Meal', icon: '🥗', xp: 10, benefit: 'Awesome choice! Nutritious food fuels your brain and body.' },
+    { id: 'meds', label: 'Took Meds', icon: '💊', xp: 10, benefit: 'Proud of you! Consistency is key to stability and wellness.' },
+    { id: 'read', label: 'Read', icon: '📖', xp: 10, benefit: 'Fantastic! Reading reduces stress and expands perspective.' },
+    { id: 'clean', label: 'Cleaned', icon: '🧹', xp: 10, benefit: 'So fresh! A tidy space promotes a calm mind.' },
+    { id: 'sleep', label: 'Good Sleep', icon: '😴', xp: 10, benefit: 'Well done! Rest is essential for emotional regulation.' }
 ];
 
 export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
@@ -24,6 +24,7 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
     const [selectedActivity, setSelectedActivity] = useState(null);
     const [journalText, setJournalText] = useState('');
     const [gratitudeList, setGratitudeList] = useState(['', '', '']);
+    const [showSuccess, setShowSuccess] = useState(false);
 
     // Self-Care State
     const [selectedSelfCare, setSelectedSelfCare] = useState(null);
@@ -60,7 +61,8 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
                     activity_type: selectedActivity.id,
                     label: selectedActivity.label,
                     icon: selectedActivity.icon,
-                    xp: selectedActivity.xp
+                    xp: selectedActivity.xp,
+                    benefit: selectedActivity.benefit // Pass benefit for potential future use
                 };
                 break;
             case WIN_TYPES.JOURNAL:
@@ -104,8 +106,7 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
 
         try {
             await onAddWin(winData);
-            resetForm();
-            onClose();
+            setShowSuccess(true);
         } catch (error) {
             console.error("Failed to add win:", error);
             // Optionally show error to user
@@ -122,6 +123,21 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
         setFilterTime('');
         setFilterCost('');
         setActiveTab(WIN_TYPES.ACTIVITY);
+        setShowSuccess(false);
+    };
+
+    const handleAddAnother = () => {
+        // Reset specific fields but keep modal open
+        setSelectedActivity(null);
+        setJournalText('');
+        setGratitudeList(['', '', '']);
+        setSelectedSelfCare(null);
+        setShowSuccess(false);
+    };
+
+    const handleDone = () => {
+        resetForm();
+        onClose();
     };
 
     // Filter Self-Care Activities
@@ -130,6 +146,44 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
         if (filterCost && activity.cost !== filterCost) return false;
         return true;
     });
+
+    if (showSuccess) {
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-fade-in-up p-6 text-center">
+                    <div className="mb-4 text-5xl">🎉</div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Win Logged!</h2>
+
+                    {activeTab === WIN_TYPES.ACTIVITY && selectedActivity && (
+                        <div className="bg-blue-50 p-4 rounded-xl mb-6 border border-blue-100">
+                            <p className="text-blue-800 font-medium italic">
+                                "{selectedActivity.benefit}"
+                            </p>
+                        </div>
+                    )}
+
+                    {activeTab !== WIN_TYPES.ACTIVITY && (
+                        <p className="text-gray-600 mb-6">Great job taking a positive step for yourself.</p>
+                    )}
+
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={handleAddAnother}
+                            className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all"
+                        >
+                            Add Another Win
+                        </button>
+                        <button
+                            onClick={handleDone}
+                            className="w-full py-3 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all"
+                        >
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -164,21 +218,23 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
                 {/* Content */}
                 <div className="p-6 overflow-y-auto flex-1">
                     {activeTab === WIN_TYPES.ACTIVITY && (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            {ACTIVITIES.map(activity => (
-                                <button
-                                    key={activity.id}
-                                    onClick={() => setSelectedActivity(activity)}
-                                    className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${selectedActivity?.id === activity.id
-                                        ? 'border-blue-500 bg-blue-50 shadow-md scale-105'
-                                        : 'border-gray-100 hover:border-blue-200 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    <span className="text-4xl mb-2">{activity.icon}</span>
-                                    <span className="text-xs font-bold text-center text-gray-700">{activity.label}</span>
-                                    <span className="text-[10px] font-bold text-blue-500 mt-1">+{activity.xp} XP</span>
-                                </button>
-                            ))}
+                        <div className="flex flex-col gap-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {ACTIVITIES.map(activity => (
+                                    <button
+                                        key={activity.id}
+                                        onClick={() => setSelectedActivity(activity)}
+                                        className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${selectedActivity?.id === activity.id
+                                            ? 'border-blue-500 bg-blue-50 shadow-md scale-105'
+                                            : 'border-gray-100 hover:border-blue-200 hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        <span className="text-4xl mb-2">{activity.icon}</span>
+                                        <span className="text-xs font-bold text-center text-gray-700">{activity.label}</span>
+                                        <span className="text-[10px] font-bold text-blue-500 mt-1">+{activity.xp} XP</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
 

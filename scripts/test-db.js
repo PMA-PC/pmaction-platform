@@ -28,20 +28,23 @@ try {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    async function testConnection() {
-        console.log('Testing Supabase connection...');
-        // Try to fetch session (should be null but not error)
-        const { data, error } = await supabase.auth.getSession();
+    async function testSignup() {
+        console.log('Attempting signup for testuser99@example.com...');
+        const { data, error } = await supabase.auth.signUp({
+            email: 'testuser99@example.com',
+            password: 'password123'
+        });
 
         if (error) {
-            console.error('❌ Connection Error:', error.message);
+            console.error('❌ Signup Failed:', error.message);
         } else {
-            console.log('✅ Connection Successful!');
-            console.log('Auth Service is responding.');
+            console.log('✅ Signup Successful!');
+            console.log('User ID:', data.user?.id);
+            console.log('Session:', data.session ? 'Active' : 'None (Email confirmation likely required)');
         }
     }
 
-    testConnection();
+    testSignup();
 
 } catch (err) {
     console.error('Script failed:', err);

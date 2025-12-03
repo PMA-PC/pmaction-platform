@@ -1,255 +1,299 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-                        </div >
-                        <h3 className="text-sm font-bold text-blue-100 uppercase tracking-wider mb-2">Total XP</h3>
-                        <p className="text-5xl font-black tracking-tight">{userProfile?.xp || 0}</p>
-                        <div className="mt-4 text-xs font-medium text-blue-200 bg-blue-700/30 inline-block px-3 py-1 rounded-full">
-                            Level {currentLevel}
-                        </div>
-                    </div >
+import { useApp } from '../lib/context';
+import { supabase } from '../lib/supabaseClient';
+import AddWinModal from '../components/AddWinModal';
+import LevelUpModal from '../components/LevelUpModal';
+import RecommendationWidget from '../components/RecommendationWidget';
+import SmartFocusCard from '../components/SmartFocusCard';
+import SelfCareHub from '../components/SelfCareHub';
+import ActiveChallengeCard from '../components/ActiveChallengeCard';
 
-                    <div className="bg-gradient-to-br from-yellow-400 to-orange-500 p-6 rounded-3xl shadow-lg text-white transform hover:scale-105 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <span className="text-8xl">💰</span>
-                        </div>
-                        <h3 className="text-sm font-bold text-yellow-100 uppercase tracking-wider mb-2">Gold</h3>
-                        <p className="text-5xl font-black tracking-tight flex items-center">
-                            {userProfile?.gold || 0}
-                        </p>
-                        <div className="mt-4 text-xs font-medium text-yellow-100 bg-yellow-600/20 inline-block px-3 py-1 rounded-full">
-                            Spend in Shop
-                        </div>
-                    </div>
+const DashboardPage = () => {
+    const router = useRouter();
+    const { user, stats, dailyLogs, wins, userProfile, addWin } = useApp();
+    const [isWinModalOpen, setIsWinModalOpen] = useState(false);
+    const [isLevelUpModalOpen, setIsLevelUpModalOpen] = useState(false);
+    const [isSelfCareHubOpen, setIsSelfCareHubOpen] = useState(false);
+    const [newLevel, setNewLevel] = useState(1);
+    const [modalTab, setModalTab] = useState(null); // 'journal', 'self_care', etc.
 
-                    <div className="bg-gradient-to-br from-red-500 to-pink-600 p-6 rounded-3xl shadow-lg text-white transform hover:scale-105 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <span className="text-8xl">❤️</span>
-                        </div>
-                        <h3 className="text-sm font-bold text-red-100 uppercase tracking-wider mb-2">Health</h3>
-                        <div className="flex items-baseline">
-                            <p className="text-5xl font-black tracking-tight">{userProfile?.hp || 100}</p>
-                            <span className="text-lg ml-2 opacity-80">/ 100</span>
-                        </div>
-                        <div className="mt-4 w-full bg-black/20 rounded-full h-2">
-                            <div className="bg-white h-2 rounded-full" style={{ width: `${userProfile?.hp || 100}%` }}></div>
-                        </div>
-                    </div>
+    // Process Daily Logs for display
+    const sortedDates = Object.keys(dailyLogs || {}).sort((a, b) => new Date(b) - new Date(a));
 
-                    <div className="bg-gradient-to-br from-orange-500 to-red-500 p-6 rounded-3xl shadow-lg text-white transform hover:scale-105 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <span className="text-8xl">🔥</span>
-                        </div>
-                        <h3 className="text-sm font-bold text-orange-100 uppercase tracking-wider mb-2">Streak</h3>
-                        <p className="text-5xl font-black tracking-tight flex items-center">
-                            {userProfile?.current_streak || 0}
-                        </p>
-                        <div className="mt-4 text-xs font-medium text-orange-100 bg-orange-700/20 inline-block px-3 py-1 rounded-full">
-                            Days in a row
-                        </div>
-                    </div>
-                </div >
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push('/login');
+    };
 
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Wins & Challenges */}
-        <div className="lg:col-span-2 space-y-8">
-            {/* Today's Wins */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-gray-800">Today's Wins</h2>
-                    <span className="text-sm font-medium text-gray-500">{wins.length} wins today</span>
-                </div>
+    const handleAddWin = async (winData) => {
+        const result = await addWin(winData);
+        if (result?.success) {
+            if (result.leveledUp) {
+                setNewLevel(result.newLevel);
+                setIsLevelUpModalOpen(true);
+            }
+        } else {
+            // alert('Failed to add win');
+        }
+    };
 
-                {wins.length === 0 ? (
-                    <div className="p-8 text-center">
-                        <div className="text-4xl mb-3">🌱</div>
-                        <p className="text-gray-500 font-medium mb-4">No wins logged yet today.</p>
-                        <button
-                            onClick={() => setIsWinModalOpen(true)}
-                            className="text-blue-600 font-bold hover:underline"
-                        >
-                            Start by drinking water or taking a breath!
-                        </button>
-                    </div>
-                ) : (
-                    <div className="divide-y divide-gray-50">
-                        {wins.map((win) => (
-                            <div key={win.id} className="p-4 flex items-center hover:bg-gray-50 transition-colors">
-                                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-xl mr-4">
-                                    {win.win_type === 'activity' ? (win.icon || '✅') :
-                                        win.win_type === 'journal' ? '📝' :
-                                            win.win_type === 'gratitude' ? '🙏' :
-                                                win.win_type === 'mindfulness' ? '🧘' : '🏆'}
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="font-bold text-gray-800">
-                                        {win.label ||
-                                            (win.win_type === 'journal' ? 'Journal Entry' :
-                                                win.win_type === 'gratitude' ? 'Gratitude Practice' :
-                                                    win.win_type === 'mindfulness' ? 'Mindfulness Session' : 'Win')}
-                                    </h3>
-                                    <p className="text-sm text-gray-500">
-                                        {new Date(win.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <span className="inline-block px-2 py-1 bg-yellow-50 text-yellow-700 text-xs font-bold rounded-md border border-yellow-100">
-                                        +{win.xp_earned} XP
-                                    </span>
+    const handleSelfCareLog = async (activity) => {
+        const winData = {
+            type: 'journal', // Log as journal entry for consistency
+            win_type: 'self_care',
+            content: `Completed self-care activity: ${activity.label}`,
+            label: activity.label,
+            icon: '🧘',
+            xp: activity.xp
+        };
+        await handleAddWin(winData);
+        setIsSelfCareHubOpen(false);
+    };
+
+    // Calculate progress to next level
+    const currentLevel = userProfile?.level || 1;
+    const currentXp = userProfile?.xp || 0;
+    const progressPercent = Math.min(100, (currentXp % 100) / 100 * 100);
+
+    return (
+        <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+            <Head>
+                <title>Dashboard | PMAction</title>
+                <meta name="description" content="Your personal dashboard for mental well-being" />
+            </Head>
+
+            <AddWinModal
+                isOpen={isWinModalOpen}
+                onClose={() => {
+                    setIsWinModalOpen(false);
+                    setModalTab(null);
+                }}
+                onAddWin={handleAddWin}
+                initialTab={modalTab}
+            />
+
+            <SelfCareHub
+                isOpen={isSelfCareHubOpen}
+                onClose={() => setIsSelfCareHubOpen(false)}
+                onLogActivity={handleSelfCareLog}
+            />
+
+            <LevelUpModal
+                isOpen={isLevelUpModalOpen}
+                onClose={() => setIsLevelUpModalOpen(false)}
+                newLevel={newLevel}
+                rewards={{ gold: 50 }}
+            />
+
+            {/* Navigation */}
+            <nav className="bg-white shadow-sm sticky top-0 z-10">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between h-16">
+                        <div className="flex items-center">
+                            <h1 className="text-2xl font-bold text-blue-600">PMAction</h1>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <div className="hidden md:flex items-center mr-4 bg-blue-50 px-3 py-1 rounded-full">
+                                <span className="text-sm font-bold text-blue-800 mr-2">Level {currentLevel}</span>
+                                <div className="w-24 h-2 bg-blue-200 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-blue-500 transition-all duration-500"
+                                        style={{ width: `${progressPercent}%` }}
+                                    />
                                 </div>
                             </div>
-                        ))}
+                            <button
+                                onClick={() => router.push('/report')}
+                                className="text-sm font-medium text-gray-500 hover:text-gray-700 mr-4"
+                            >
+                                Reports
+                            </button>
+                            <button
+                                onClick={() => router.push('/settings')}
+                                className="text-sm font-medium text-gray-500 hover:text-gray-700 mr-4"
+                            >
+                                Settings
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                className="text-sm font-medium text-gray-500 hover:text-gray-700"
+                            >
+                                Logout
+                            </button>
+                        </div>
                     </div>
-                )}
-            </div>
+                </div>
+            </nav>
 
-            {/* Active Challenges (Placeholder) */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl shadow-lg text-white p-6">
-                <div className="flex justify-between items-start mb-4">
+            <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8">
                     <div>
-                        <h2 className="text-xl font-bold mb-1">Weekly Challenge</h2>
-                        <p className="text-purple-100 text-sm">Ends in 3 days</p>
+                        <h1 className="text-3xl font-bold text-gray-900">
+                            Welcome back, {userProfile?.nickname || userProfile?.preferred_name || user?.user_metadata?.full_name || user?.email?.split('@')[0]}! 👋
+                        </h1>
+                        <p className="mt-1 text-gray-600">Ready to win the day?</p>
                     </div>
-                    <span className="bg-white/20 px-3 py-1 rounded-lg text-xs font-bold backdrop-blur-sm">
-                        250 XP
-                    </span>
+                    <button
+                        onClick={() => setIsWinModalOpen(true)}
+                        className="mt-4 md:mt-0 px-6 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 hover:scale-105 transition-all flex items-center"
+                    >
+                        <span className="text-xl mr-2">🏆</span> Log a Win
+                    </button>
                 </div>
-                <div className="mb-4">
-                    <h3 className="font-bold text-lg mb-2">Mindfulness Master</h3>
-                    <p className="text-purple-100 text-sm mb-4">Complete 5 mindfulness sessions this week.</p>
-                    <div className="w-full bg-black/20 rounded-full h-2">
-                        <div className="bg-white h-2 rounded-full w-2/5"></div>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold mt-1 text-purple-200">
-                        <span>2 / 5 completed</span>
-                        <span>40%</span>
-                    </div>
-                </div>
-                <button className="w-full py-2 bg-white text-purple-600 font-bold rounded-lg hover:bg-purple-50 transition-colors">
-                    View Details
-                </button>
-            </div>
-        </div>
 
-        {/* Right Column: Journal & Mood */}
-        <div className="space-y-8">
-            {/* Reminders Widget */}
-            {/* Why Daily Use Matters - Redesigned */}
-            <div className="bg-gradient-to-br from-violet-600 to-purple-700 rounded-3xl shadow-lg p-6 text-white relative overflow-hidden">
-                <div className="relative z-10">
-                    <h2 className="text-xl font-bold mb-4 flex items-center">
-                        <span className="bg-white/20 p-2 rounded-lg mr-3">🚀</span>
-                        Why Daily Use Matters
-                    </h2>
-                    <div className="space-y-4">
-                        <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/10 flex items-start gap-4 hover:bg-white/20 transition-colors">
-                            <div className="bg-white text-purple-600 w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0">
-                                1
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-lg">Consistency is Key</h3>
-                                <p className="text-purple-100 text-sm">Small daily actions build powerful long-term habits.</p>
-                            </div>
+                {/* Top Section: Recommendation + Nav Buttons (4 Columns) */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-12">
+                    {/* Column 1: Recommendation Widget */}
+                    <div onClick={() => setIsWinModalOpen(true)} className="h-full">
+                        <RecommendationWidget />
+                    </div>
+
+                    {/* Columns 2-4: Navigation Buttons (Card Style) */}
+                    <button
+                        onClick={() => {
+                            setModalTab('journal');
+                            setIsWinModalOpen(true);
+                        }}
+                        className="p-4 bg-white border-2 border-fuchsia-500 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition-all group flex flex-col items-center justify-center text-center min-h-[120px]"
+                    >
+                        <span className="text-4xl mb-2 group-hover:scale-110 transition-transform">🎭</span>
+                        <span className="font-bold text-lg text-fuchsia-700">Mood Check-In</span>
+                    </button>
+
+                    <button
+                        onClick={() => setIsSelfCareHubOpen(true)}
+                        className="p-4 bg-white border-2 border-purple-500 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition-all group flex flex-col items-center justify-center text-center min-h-[120px]"
+                    >
+                        <span className="text-4xl mb-2 group-hover:scale-110 transition-transform">🧘</span>
+                        <span className="font-bold text-lg text-purple-700">Self-Care</span>
+                    </button>
+
+                    <button
+                        onClick={() => router.push('/library')}
+                        className="p-4 bg-white border-2 border-indigo-500 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 transition-all group flex flex-col items-center justify-center text-center min-h-[120px]"
+                    >
+                        <span className="text-4xl mb-2 group-hover:scale-110 transition-transform">🆘</span>
+                        <span className="font-bold text-lg text-indigo-700">Resources / HELP</span>
+                    </button>
+                </div>
+
+                {/* Daily Overview Checklist & Smart Focus */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                    {/* Left Column: Daily Overview Checklist */}
+                    <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-gray-800">Daily Overview</h2>
+                            <span className="text-sm font-medium text-gray-500">{new Date().toLocaleDateString()}</span>
                         </div>
-                        <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/10 flex items-start gap-4 hover:bg-white/20 transition-colors">
-                            <div className="bg-white text-purple-600 w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0">
-                                2
+
+                        <div className="p-6 space-y-4">
+                            {/* Checklist Items */}
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${dailyLogs[new Date().toISOString().split('T')[0]]?.mood_score ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`}>
+                                        {dailyLogs[new Date().toISOString().split('T')[0]]?.mood_score && '✓'}
+                                    </div>
+                                    <span className="font-bold text-gray-700">Mood Check-In</span>
+                                </div>
+                                {!dailyLogs[new Date().toISOString().split('T')[0]]?.mood_score && (
+                                    <button onClick={() => { setModalTab('journal'); setIsWinModalOpen(true); }} className="text-sm text-blue-600 font-bold hover:underline">Check In</button>
+                                )}
                             </div>
-                            <div>
-                                <h3 className="font-bold text-lg">Track Patterns</h3>
-                                <p className="text-purple-100 text-sm">Spot trends in your mood and energy levels.</p>
+
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${wins.length > 0 ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`}>
+                                        {wins.length > 0 && '✓'}
+                                    </div>
+                                    <span className="font-bold text-gray-700">Log a Win</span>
+                                </div>
+                                {wins.length === 0 && (
+                                    <button onClick={() => setIsWinModalOpen(true)} className="text-sm text-blue-600 font-bold hover:underline">Log Win</button>
+                                )}
                             </div>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/10 flex items-start gap-4 hover:bg-white/20 transition-colors">
-                            <div className="bg-white text-purple-600 w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0">
-                                3
+
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${wins.some(w => w.win_type === 'self_care' || w.win_type === 'mindfulness') ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`}>
+                                        {wins.some(w => w.win_type === 'self_care' || w.win_type === 'mindfulness') && '✓'}
+                                    </div>
+                                    <span className="font-bold text-gray-700">Self-Care / Mindfulness</span>
+                                </div>
+                                {!wins.some(w => w.win_type === 'self_care' || w.win_type === 'mindfulness') && (
+                                    <button onClick={() => setIsSelfCareHubOpen(true)} className="text-sm text-blue-600 font-bold hover:underline">Do It</button>
+                                )}
                             </div>
-                            <div>
-                                <h3 className="font-bold text-lg">Unlock Insights</h3>
-                                <p className="text-purple-100 text-sm">Get personalized recommendations based on your data.</p>
+
+                            {/* Free Form Quick Add */}
+                            <div className="mt-6 pt-4 border-t border-gray-100">
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Quick Add Win</label>
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const text = e.target.elements.quickWin.value;
+                                        if (text.trim()) {
+                                            handleAddWin({ label: text, xp: 5, icon: '⚡', win_type: 'activity' });
+                                            e.target.reset();
+                                        }
+                                    }}
+                                    className="flex gap-2"
+                                >
+                                    <input
+                                        name="quickWin"
+                                        type="text"
+                                        placeholder="I drank water, I made the bed..."
+                                        className="flex-1 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                    />
+                                    <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors">
+                                        Add
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
-                </div>
-                {/* Decorative Background Circles */}
-                <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
-                <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-40 h-40 bg-purple-500/30 rounded-full blur-2xl"></div>
-            </div>
 
-            {/* Focus Areas */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Daily Check-in */}
+                    {/* Right Column: Smart Rotating Focus Card & Active Challenge */}
+                    <div className="space-y-8">
+                        <SmartFocusCard
+                            dailyStatus={{
+                                mood: !!dailyLogs[new Date().toISOString().split('T')[0]]?.mood_score,
+                                win: wins.length > 0,
+                                selfCare: wins.some(w => w.win_type === 'self_care' || w.win_type === 'mindfulness')
+                            }}
+                            onAction={(action) => {
+                                if (action === 'mood') { setModalTab('journal'); setIsWinModalOpen(true); }
+                                else if (action === 'self_care') { setIsSelfCareHubOpen(true); }
+                                else { setIsWinModalOpen(true); }
+                            }}
+                        />
+
+                        {/* Active Challenge Card (Mocked with Physiology First) */}
+                        <ActiveChallengeCard
+                            challenge={{
+                                title: 'Physiology First',
+                                duration: 5,
+                                id: 'physiology_first'
+                            }}
+                        />
+                    </div>
+                </div>
+
+                {/* Floating Action Button (FAB) */}
                 <button
                     onClick={() => {
                         setModalTab('journal');
                         setIsWinModalOpen(true);
                     }}
-                    className="p-6 bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-blue-300 hover:shadow-md transition-all text-left group relative overflow-hidden"
+                    className="fixed bottom-8 right-8 w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full shadow-2xl flex items-center justify-center text-white text-3xl font-bold hover:scale-110 hover:rotate-90 transition-all duration-300 z-50 ring-4 ring-pink-200"
+                    aria-label="Log a Win"
                 >
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <span className="text-6xl">📝</span>
-                    </div>
-                    <span className="text-3xl mb-3 block group-hover:scale-110 transition-transform origin-left">📝</span>
-                    <h3 className="text-lg font-bold text-gray-800 mb-1">Daily Check-in</h3>
-                    <p className="text-sm text-gray-500">Log your mood, wins, and thoughts.</p>
+                    ➕
                 </button>
-
-                {/* Self-Care */}
-                <button
-                    onClick={() => {
-                        setModalTab('self_care');
-                        setIsWinModalOpen(true);
-                    }}
-                    className="p-6 bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-purple-300 hover:shadow-md transition-all text-left group relative overflow-hidden"
-                >
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <span className="text-6xl">🧘</span>
-                    </div>
-                    <span className="text-3xl mb-3 block group-hover:scale-110 transition-transform origin-left">🧘</span>
-                    <h3 className="text-lg font-bold text-gray-800 mb-1">Self-Care</h3>
-                    <p className="text-sm text-gray-500">Find an activity for you.</p>
-                </button>
-
-                {/* Resources */}
-                <button
-                    onClick={() => router.push('/library')}
-                    className="p-6 bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-indigo-300 hover:shadow-md transition-all text-left group relative overflow-hidden"
-                >
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <span className="text-6xl">📚</span>
-                    </div>
-                    <span className="text-3xl mb-3 block group-hover:scale-110 transition-transform origin-left">📚</span>
-                    <h3 className="text-lg font-bold text-gray-800 mb-1">Resources</h3>
-                    <p className="text-sm text-gray-500">Explore articles and quizzes.</p>
-                </button>
-            </div>
-
-            {/* Recent Journal */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-lg font-bold text-gray-800 mb-4">Recent Thoughts</h2>
-                {recentJournalEntries.length === 0 ? (
-                    <p className="text-gray-500 text-sm italic">No entries yet.</p>
-                ) : (
-                    <div className="space-y-4">
-                        {recentJournalEntries.map(entry => (
-                            <div key={entry.date} className="p-3 bg-gray-50 rounded-xl">
-                                <div className="text-xs text-gray-400 font-bold mb-1">{entry.date}</div>
-                                <p className="text-gray-600 text-sm line-clamp-3">{entry.journal_content}</p>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                <button
-                    onClick={() => router.push('/journal')}
-                    className="w-full mt-4 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                    View All Entries
-                </button>
-            </div>
+            </main>
         </div>
-    </div>
-            </main >
-        </div >
     );
 };
 
