@@ -5,8 +5,8 @@ import { useReactToPrint } from 'react-to-print';
 import { useApp } from '../lib/context';
 import { analyticsService } from '../lib/services/analyticsService';
 import { pdfService } from '../lib/services/pdfService';
-import MoodChart from '../components/MoodChart';
-import MoodHeatmap from '../components/MoodHeatmap';
+import { MoodChart } from '../components/MoodChart';
+import { MoodHeatmap } from '../components/MoodHeatmap';
 
 const ReportPage = () => {
     const router = useRouter();

@@ -58,25 +58,20 @@
     - [x] Personalization Settings.
     - [ ] (Future) Dynamic difficulty/scoring.
 
-## Phase 3: Engagement & Gamification (New!)
-- [ ] Visual Badges System (Trophy Case)
-    - [ ] Create `lib/badgesData.js` (Include "Momentum Maker", "Flow Master", etc.).
-    - [ ] Implement `BadgeComponent` and `TrophyCase`.
-    - [ ] Integrate Badge unlocking logic.
-- [ ] Structured Challenge Tracks (Challenge Engine)
-    - [x] Create `lib/challengesData.js` (Implement "Focus Flow Builder 2.0" - 30 Days).
-    - [x] Build "Challenge Library" Page (Browse & Enroll).
-    - [x] Implement "Active Challenge" Card in Dashboard (Daily Task view).
-    - [ ] Implement "Challenge Progress" Logic (Unlock days, track points).
-    - [x] Implement Content-Based Challenges (from Notebook Summary)
-        - [x] Challenge 1: Physiology First (5 Days)
-        - [x] Challenge 2: Crisis Control (5 Days)
-        - [x] Challenge 3: Thought Detective (5 Days)
-        - [x] Challenge 4: CEO Brain (5 Days)
-        - [x] Challenge 5: Social Navigator (3 Days)
-        - [x] Challenge 6: Authentic Self (5 Days)
-        - [x] Challenge 7: ADHD Foundations (30 Days - Theory)
-        - [x] Challenge 8: Emotional Mastery (30 Days - Theory)
+## Phase 3: Dashboard Refinement & New Features (Completed)
+- [x] **Dashboard UI Overhaul**
+    - [x] Remove "Daily Overview" (Redundant).
+    - [x] Enhance Top Nav Buttons (Mood/Self-Care) with completion status.
+    - [x] Reorder Cards: Active Challenge below Smart Focus.
+    - [x] Header: Replace "Welcome back" with **Daily Quote**.
+    - [x] Left Column: Add **Smart Insight** (bottom) and **Content Recommendation Card** (middle).
+    - [x] Right Column: Add **Time-Based Cards** (1, 5, 10 min).
+- [x] **New Features**
+    - [x] **AI Self-Help:** `/self-help` with Gemini integration.
+    - [x] **Privacy Policy:** `/privacy`.
+    - [x] **Community Page:** `/community` (placeholder).
+    - [x] **FAQ Page:** `/faq`.
+    - [x] **Crisis Support:** Crisis Modal linked to dashboard button.
 
 
 

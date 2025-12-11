@@ -1,77 +1,25 @@
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
-const MoodChart = ({ data }) => {
-    // data format: [{ date: '2023-10-27', mood: 4 }, ...]
-
-    if (!data || data.length === 0) {
-        return (
-            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-xl border border-gray-100">
-                <p className="text-gray-400">No mood data available yet.</p>
-            </div>
-        );
+export const MoodChart = ({ moods }) => {
+    if (!moods || moods.length === 0) {
+        return <div className="text-center p-4 bg-gray-50 rounded-lg"><p>Log your mood to see your chart.</p></div>;
     }
 
-    const CustomTooltip = ({ active, payload, label }) => {
-        if (active && payload && payload.length) {
-            const moodVal = payload[0].value;
-            let moodEmoji = '😐';
-            if (moodVal >= 4.5) moodEmoji = '🤩';
-            else if (moodVal >= 4) moodEmoji = '🙂';
-            else if (moodVal >= 3) moodEmoji = '😐';
-            else if (moodVal >= 2) moodEmoji = '😕';
-            else moodEmoji = '😢';
-
-            return (
-                <div className="bg-white p-3 border border-gray-100 shadow-lg rounded-lg">
-                    <p className="text-sm font-bold text-gray-700">{label}</p>
-                    <p className="text-sm text-blue-600">
-                        Mood: {moodVal} <span className="text-lg ml-1">{moodEmoji}</span>
-                    </p>
-                </div>
-            );
-        }
-        return null;
-    };
-
+    // This is a very simple representation.
     return (
-        <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                    data={data}
-                    margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-                >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis
-                        dataKey="date"
-                        tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                        axisLine={false}
-                        tickLine={false}
-                        minTickGap={30}
-                    />
-                    <YAxis
-                        domain={[1, 5]}
-                        ticks={[1, 2, 3, 4, 5]}
-                        tick={{ fontSize: 12, fill: '#9CA3AF' }}
-                        axisLine={false}
-                        tickLine={false}
-                        width={30}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <ReferenceLine y={3} stroke="#E5E7EB" strokeDasharray="3 3" />
-                    <Line
-                        type="monotone"
-                        dataKey="mood"
-                        stroke="#4F46E5"
-                        strokeWidth={3}
-                        dot={{ r: 4, fill: '#4F46E5', strokeWidth: 2, stroke: '#fff' }}
-                        activeDot={{ r: 6, fill: '#4F46E5' }}
-                        animationDuration={1500}
-                    />
-                </LineChart>
-            </ResponsiveContainer>
+        <div className="p-4 bg-white rounded-lg shadow border border-gray-100">
+            <h3 className="font-bold text-lg mb-4 text-gray-800">Your Mood Over Time</h3>
+            <div className="flex items-end h-48 space-x-2 border-l border-b border-gray-300 p-2">
+                {moods.slice(-30).map(mood => ( // Show last 30 entries
+                    <div
+                        key={mood.id}
+                        className="flex-1 bg-teal-400 hover:bg-teal-600 transition-colors rounded-t-sm"
+                        style={{ height: `${(mood.mood?.value || 3) * 20}%` }}
+                        title={`${mood.mood?.name || 'Mood'} on ${new Date(mood.date).toLocaleDateString()}`}
+                    >
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
-
-export default MoodChart;

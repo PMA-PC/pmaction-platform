@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useApp } from '../../../../lib/context'; // Adjust path as needed
 import { supabase } from '../../../../lib/supabaseClient';
 import ReactMarkdown from 'react-markdown';
+import GeminiDeepDive from '../../../../components/GeminiDeepDive';
 
 export default function LessonPage() {
     const router = useRouter();
@@ -395,6 +396,8 @@ export default function LessonPage() {
                                         )}
                                     </React.Fragment>
                                 )}
+
+                                <GeminiDeepDive currentDayContent={currentModule.content} />
                             </div>
                         )}
 
@@ -490,8 +493,8 @@ export default function LessonPage() {
                                         onClick={handleComplete}
                                         disabled={completing || reflection.length < 10}
                                         className={`px-8 py-3 rounded-lg font-bold shadow-lg transition-transform transform hover:scale-105 ${completing || reflection.length < 10
-                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                : 'bg-teal-600 text-white hover:bg-teal-700'
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                            : 'bg-teal-600 text-white hover:bg-teal-700'
                                             }`}
                                     >
                                         {completing ? 'Completing...' : 'Complete Lesson'}

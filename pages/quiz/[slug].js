@@ -11,12 +11,19 @@ export default function QuizPage() {
 
     const [assessment, setAssessment] = useState(null);
     const [questions, setQuestions] = useState([]);
-    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [groupedQuestions, setGroupedQuestions] = useState({});
+    const [sections, setSections] = useState([]);
+
+    // User State
     const [answers, setAnswers] = useState({});
-    const [comments, setComments] = useState({}); // Store follow-up comments
+    const [comments, setComments] = useState({});
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [completed, setCompleted] = useState(false);
+
+    // Navigation State
+    const [view, setView] = useState('hub'); // 'hub' | 'section' | 'results'
+    const [activeSection, setActiveSection] = useState(null);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [result, setResult] = useState(null);
 
     useEffect(() => {
@@ -25,10 +32,47 @@ export default function QuizPage() {
         }
     }, [router.isReady, slug]);
 
+    // Save progress periodically or on section exit
+    const saveProgress = async (isCompleting = false) => {
+        if (!user || !assessment) return;
+
+        try {
+            const submission = {
+                user_id: user.id,
+                assessment_id: assessment.id,
+                responses: { answers, comments },
+                total_score: calculateTotalScore(),
+                // If isCompleting is true, we might mark it finished, otherwise it's in progress
+                // For now, we only mark completed_at if every single question is answered
+                completed_at: isCompleting && isAllQuestionsAnswered() ? new Date().toISOString() : null
+            };
+
+            // Check if existing record
+            const { data: existing } = await supabase
+                .from('user_assessments')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('assessment_id', assessment.id)
+                .single();
+
+            if (existing) {
+                await supabase
+                    .from('user_assessments')
+                    .update(submission)
+                    .eq('id', existing.id);
+            } else {
+                await supabase
+                    .from('user_assessments')
+                    .insert([submission]);
+            }
+        } catch (err) {
+            console.error("Error saving progress:", err);
+        }
+    };
+
     const fetchQuizData = async () => {
         try {
             setLoading(true);
-            // Fetch assessment details
             const { data: assessmentData, error: assessmentError } = await supabase
                 .from('assessments')
                 .select('*')
@@ -38,7 +82,6 @@ export default function QuizPage() {
             if (assessmentError) throw assessmentError;
             setAssessment(assessmentData);
 
-            // Fetch questions
             const { data: questionsData, error: questionsError } = await supabase
                 .from('assessment_questions')
                 .select('*')
@@ -46,32 +89,224 @@ export default function QuizPage() {
                 .order('question_number');
 
             if (questionsError) throw questionsError;
+
+            // Group by section
+            const grouped = {};
+            const sectionList = [];
+            questionsData.forEach(q => {
+                const sec = q.section || "General";
+                if (!grouped[sec]) {
+                    grouped[sec] = [];
+                    sectionList.push(sec);
+                }
+                grouped[sec].push(q);
+            });
+
             setQuestions(questionsData);
+            setGroupedQuestions(grouped);
+            setSections(sectionList);
+
+            // Fetch existing answers if logged in
+            if (user) {
+                const { data: userData } = await supabase
+                    .from('user_assessments')
+                    .select('responses')
+                    .eq('user_id', user.id)
+                    .eq('assessment_id', assessmentData.id)
+                    .single();
+
+                if (userData?.responses) {
+                    setAnswers(userData.responses.answers || {});
+                    setComments(userData.responses.comments || {});
+                }
+            }
 
         } catch (error) {
             console.error('Error fetching quiz:', error);
-            alert('Failed to load quiz. Please try again.');
+            alert('Failed to load quiz.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAnswer = (value) => {
-        setAnswers(prev => ({
-            ...prev,
-            [currentQuestionIndex]: value
-        }));
+    const handleStartSection = (section) => {
+        setActiveSection(section);
+        setView('section');
+        // Find first unanswered question in this section or start at 0
+        const sectionQs = groupedQuestions[section];
+        const firstUnanswered = sectionQs.findIndex(q => !answers[q.question_number - 1]); // question_number is 1-based usually, check logic
+        // Actually, let's just create a quick index map.
+        // answers keys are INDICES based on the FULL questions array in previous implementation
+        // Let's stick to using question ID or global index for answers.
+        // Previous implementation: answers[index].
+
+        // We will map local section index to global questions index
+        setCurrentQuestionIndex(0);
+    };
+
+    const handleAnswer = (val) => {
+        const globalIndex = getGlobalIndex(activeSection, currentQuestionIndex);
+        setAnswers(prev => ({ ...prev, [globalIndex]: val }));
     };
 
     const handleComment = (text) => {
-        setComments(prev => ({
-            ...prev,
-            [currentQuestionIndex]: text
-        }));
+        const globalIndex = getGlobalIndex(activeSection, currentQuestionIndex);
+        setComments(prev => ({ ...prev, [globalIndex]: text }));
+    }
+
+    const getGlobalIndex = (section, localIndex) => {
+        if (!section) return 0;
+        const q = groupedQuestions[section][localIndex];
+        // Find this q in the main questions array to get its original index key
+        // Or better, stick to question_number? 
+        // Original code used `questions.forEach((q, index) => ... answers[index])`
+        // So answers is keyed by the index in the `questions` array (0 to 195)
+        return questions.findIndex(item => item.id === q.id);
     };
 
-    // Parse question text to separate main question from follow-up
+    const currentGlobalIndex = activeSection ? getGlobalIndex(activeSection, currentQuestionIndex) : 0;
+    const currentQData = activeSection ? groupedQuestions[activeSection][currentQuestionIndex] : null;
+
+    const handleNext = async () => {
+        const sectionQs = groupedQuestions[activeSection];
+        if (currentQuestionIndex < sectionQs.length - 1) {
+            setCurrentQuestionIndex(prev => prev + 1);
+        } else {
+            // End of section
+            await saveProgress();
+            setView('hub');
+            setActiveSection(null);
+        }
+    };
+
+    const handlePrev = () => {
+        if (currentQuestionIndex > 0) {
+            setCurrentQuestionIndex(prev => prev - 1);
+        }
+    };
+
+    const getSectionProgress = (section) => {
+        const qs = groupedQuestions[section] || [];
+        if (qs.length === 0) return 0;
+        let answered = 0;
+        qs.forEach(q => {
+            const globalIndex = questions.findIndex(item => item.id === q.id);
+            if (answers[globalIndex]) answered++;
+        });
+        return Math.round((answered / qs.length) * 100);
+    };
+
+    const isAllQuestionsAnswered = () => {
+        return questions.every((q, idx) => answers[idx]);
+    }
+
+    const calculateTotalScore = () => {
+        let total = 0;
+        Object.values(answers).forEach(val => {
+            total += parseInt(val) || 0;
+        });
+        return total;
+    }
+
+    const handleSubmitAssessment = async () => {
+        setSubmitting(true);
+        await saveProgress(true); // Mark complete
+        setSubmitting(false);
+        // Calculate result
+        const s = calculateTotalScore();
+        setResult({ score: s, interpretation: "Assessment Complete" }); // specialized logic later
+        setView('results');
+    };
+
+    // --- RENDER ---
+
+    if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
+
+    if (view === 'results') {
+        return (
+            <div className="min-h-screen bg-gray-50 py-12 px-4 text-center">
+                <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+                    <h2 className="text-3xl font-bold text-indigo-600 mb-4">Assessment Complete</h2>
+                    <p className="text-gray-600 mb-8">Score: {result.score}</p>
+                    <button onClick={() => router.push('/assessments')} className="bg-gray-900 text-white px-6 py-2 rounded-lg">Back to Dashboard</button>
+                </div>
+            </div>
+        )
+    }
+
+    // HUB VIEW
+    if (view === 'hub') {
+        const allDone = isAllQuestionsAnswered();
+        return (
+            <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+                <div className="max-w-5xl mx-auto">
+                    <button onClick={() => router.push('/assessments')} className="text-gray-500 mb-6 flex items-center">← Back to Assessments</button>
+
+                    <div className="bg-white rounded-2xl shadow-sm p-8 mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2">{assessment.name}</h1>
+                        <p className="text-gray-600 max-w-2xl">{assessment.description}</p>
+
+                        <div className="mt-6 flex items-center justify-between bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                            <div className="flex items-center space-x-3">
+                                <div className="bg-indigo-600 text-white font-bold rounded-full w-10 h-10 flex items-center justify-center">
+                                    {Math.round((Object.keys(answers).length / questions.length) * 100)}%
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-indigo-900">Overall Progress</p>
+                                    <p className="text-sm text-indigo-700">{Object.keys(answers).length} of {questions.length} questions answered</p>
+                                </div>
+                            </div>
+                            {allDone && (
+                                <button
+                                    onClick={handleSubmitAssessment}
+                                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-all"
+                                >
+                                    Submit Assessment
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {sections.map(section => {
+                            const progress = getSectionProgress(section);
+                            const qCount = groupedQuestions[section].length;
+                            return (
+                                <button
+                                    key={section}
+                                    onClick={() => handleStartSection(section)}
+                                    className="text-left group bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:border-indigo-300 hover:shadow-md transition-all duration-200"
+                                >
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors">{section}</h3>
+                                        {progress === 100 ? (
+                                            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">Completed</span>
+                                        ) : progress > 0 ? (
+                                            <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">In Progress</span>
+                                        ) : (
+                                            <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full font-medium">To Do</span>
+                                        )}
+                                    </div>
+
+                                    <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
+                                        <div className="bg-indigo-600 h-2 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 text-right">{progress}% ({Math.round((progress / 100) * qCount)}/{qCount})</p>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // SECTION QUIZ VIEW
+    // Reuse existing renderer logic but scoped
     const parseQuestion = (questionText) => {
+        // Safe check for content types that might not have follow-ups
+        if (!questionText) return { mainQuestion: "", followUp: null };
+
         const followUpMatch = questionText.match(/\(Follow-up:(.+?)\)/);
         if (followUpMatch) {
             const mainQuestion = questionText.replace(/\(Follow-up:(.+?)\)/, '').trim();
@@ -81,253 +316,156 @@ export default function QuizPage() {
         return { mainQuestion: questionText, followUp: null };
     };
 
-    const handleNext = () => {
-        if (currentQuestionIndex < questions.length - 1) {
-            setCurrentQuestionIndex(prev => prev + 1);
-        } else {
-            handleSubmit();
+    const { mainQuestion, followUp } = parseQuestion(currentQData.question_text);
+
+    // --- RENDERERS ---
+
+    // 1. Content Slide (Educational Material)
+    if (activeSection && currentQData?.response_type === 'content') {
+        // Handle both real newlines and literal \n sequences
+        const normalizedText = currentQData.question_text.replace(/\\n/g, '\n');
+        const lines = normalizedText.split('\n');
+        const title = lines[0].replace(/###\s*/, '');
+        const body = lines.slice(1).join('\n');
+
+        // Mark as "answered" immediately so they can proceed
+        if (!answers[currentGlobalIndex]) {
+            // Auto-mark as read
+            setTimeout(() => handleAnswer("READ"), 500);
         }
-    };
 
-    const handlePrevious = () => {
-        if (currentQuestionIndex > 0) {
-            setCurrentQuestionIndex(prev => prev - 1);
-        }
-    };
-
-    const calculateScore = () => {
-        if (assessment.scoring_method === 'sum') {
-            let total = 0;
-            questions.forEach((q, index) => {
-                const answerValue = answers[index];
-                // Assuming answerValue is the numeric value from the option
-                // For Likert: 0, 1, 2, 3
-                total += parseInt(answerValue) || 0;
-            });
-            return total;
-        }
-        return 0; // Default for non-scored
-    };
-
-    const getInterpretation = (score) => {
-        if (!assessment.interpretation_ranges || !assessment.interpretation_ranges.ranges) return null;
-
-        const ranges = assessment.interpretation_ranges.ranges;
-        const interpretation = ranges.find(r => score >= r.min && score <= r.max);
-        return interpretation;
-    };
-
-    const handleSubmit = async () => {
-        try {
-            setSubmitting(true);
-            const score = calculateScore();
-            const interpretationObj = getInterpretation(score);
-
-            const resultData = {
-                score,
-                interpretation: interpretationObj ? interpretationObj.interpretation : 'Completed'
-            };
-
-            // Only save to database if user is logged in
-            if (user) {
-                const submission = {
-                    user_id: user.id,
-                    assessment_id: assessment.id,
-                    responses: { answers, comments }, // Include both answers and comments
-                    total_score: score,
-                    interpretation: resultData.interpretation,
-                    is_flagged_crisis: false // Implement crisis logic if needed
-                };
-
-                const { error } = await supabase
-                    .from('user_assessments')
-                    .insert([submission]);
-
-                if (error) throw error;
-            } else {
-                // Show a message that results won't be saved
-                console.log('Results not saved - user not logged in');
-            }
-
-            setResult(resultData);
-            setCompleted(true);
-
-        } catch (error) {
-            console.error('Error submitting quiz:', error);
-            alert('Failed to submit results. Please try again.');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            </div>
-        );
-    }
-
-    if (!assessment) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <h1 className="text-2xl font-bold text-gray-900">Quiz Not Found</h1>
-                    <button onClick={() => router.push('/assessments')} className="mt-4 text-indigo-600 hover:underline">
-                        Back to Assessments
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    if (completed) {
-        return (
-            <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-                <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
-                    <div className="bg-indigo-600 px-6 py-8 text-center">
-                        <h2 className="text-3xl font-bold text-white">Assessment Completed</h2>
-                        <p className="mt-2 text-indigo-100">Thank you for checking in with yourself.</p>
+            <div className="min-h-screen bg-white py-12 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center">
+                <div className="max-w-2xl w-full">
+                    <div className="mb-8">
+                        <span className="text-xs font-bold tracking-wider text-indigo-500 uppercase">{activeSection} • Lesson</span>
+                        <h2 className="text-3xl font-bold text-gray-900 mt-2 mb-6">{title}</h2>
+                        <div className="prose prose-indigo text-gray-600 text-lg leading-relaxed whitespace-pre-wrap">
+                            {body}
+                        </div>
                     </div>
-                    <div className="px-6 py-8">
-                        <div className="text-center mb-8">
-                            {assessment.scoring_method === 'sum' && (
-                                <>
-                                    <p className="text-sm text-gray-500 uppercase tracking-wide">Your Score</p>
-                                    <p className="text-5xl font-bold text-indigo-600 mt-2">{result.score}</p>
-                                </>
-                            )}
-                            <div className="mt-6 p-6 bg-gray-50 rounded-xl border border-gray-100">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Interpretation</h3>
-                                <p className="text-gray-700 leading-relaxed">{result.interpretation}</p>
-                            </div>
-                            {!user && (
-                                <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                                    <p className="text-sm text-yellow-800">
-                                        <strong>Note:</strong> Your results were not saved because you're not logged in.
-                                        <a href="/login" className="underline ml-1">Log in</a> to save your assessment history.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex justify-center">
-                            <button
-                                onClick={() => router.push('/assessments')}
-                                className="px-8 py-3 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition-colors"
-                            >
-                                Back to Assessments
-                            </button>
-                        </div>
+
+                    <div className="flex justify-end pt-6 border-t border-gray-100">
+                        <button
+                            onClick={handleNext}
+                            className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-indigo-700 hover:scale-[1.02] transition-all"
+                        >
+                            Continue <span className="text-xl">→</span>
+                        </button>
                     </div>
                 </div>
             </div>
         );
     }
 
-    const currentQuestion = questions[currentQuestionIndex];
-    const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+    // 2. Journal Activity
+    if (activeSection && currentQData?.response_type === 'journal') {
+        return (
+            <div className="min-h-screen bg-indigo-50 py-12 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center">
+                <div className="max-w-2xl w-full bg-white p-8 rounded-3xl shadow-xl border border-indigo-100">
+                    <div className="flex items-center gap-3 mb-6">
+                        <span className="text-4xl">✍️</span>
+                        <div>
+                            <span className="text-xs font-bold tracking-wider text-indigo-500 uppercase">{activeSection} • Reflection</span>
+                            <h2 className="text-2xl font-bold text-gray-900">Journaling Activity</h2>
+                        </div>
+                    </div>
 
+                    <p className="text-lg text-gray-700 font-medium mb-4">{currentQData.question_text}</p>
+
+                    <textarea
+                        value={comments[currentGlobalIndex] || ''}
+                        onChange={(e) => {
+                            handleComment(e.target.value);
+                            // Auto-set "answer" so they can proceed once they type something
+                            if (e.target.value.length > 5) handleAnswer("JOURNALED");
+                        }}
+                        className="w-full h-40 p-4 border-2 border-indigo-100 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none text-gray-700 text-lg resize-none transition-all"
+                        placeholder="Type your thoughts here..."
+                    />
+
+                    <div className="flex justify-between items-center mt-8">
+                        <span className="text-sm text-gray-400">
+                            {comments[currentGlobalIndex]?.length > 0 ? 'Saved to your private journal.' : 'Write a few words to continue...'}
+                        </span>
+                        <button
+                            onClick={async () => {
+                                // Save explicit Journal Win
+                                if (comments[currentGlobalIndex]) {
+                                    try {
+                                        // We can integrate with useApp here if needed to log a "Win", but for now just saving to assessment is enough
+                                    } catch (e) { }
+                                }
+                                handleNext();
+                            }}
+                            disabled={!answers[currentGlobalIndex]} // Button enabled only after typing
+                            className={`px-8 py-3 rounded-xl font-bold transition-all ${answers[currentGlobalIndex]
+                                ? 'bg-indigo-600 text-white shadow-lg hover:bg-indigo-700'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                        >
+                            Save & Continue
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // 3. Standard Multiple Choice (Default)
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <Head>
-                <title>{assessment.name} | PMAction</title>
-            </Head>
-
             <div className="max-w-3xl mx-auto">
-                {/* Header */}
-                <div className="mb-8 flex items-center justify-between">
-                    <button
-                        onClick={() => router.back()}
-                        className="text-gray-500 hover:text-gray-900 font-medium flex items-center"
-                    >
-                        ← Cancel
+                <div className="mb-6 flex items-center justify-between">
+                    <button onClick={() => { saveProgress(); setView('hub'); }} className="text-gray-500 hover:text-indigo-600 font-medium flex items-center">
+                        ← Back to Hub
                     </button>
-                    <span className="text-sm font-medium text-gray-500">
-                        Question {currentQuestionIndex + 1} of {questions.length}
-                    </span>
+                    <span className="text-sm font-medium text-gray-500">{activeSection} • {currentQuestionIndex + 1}/{groupedQuestions[activeSection].length}</span>
                 </div>
 
-                {/* Progress Bar */}
-                <div className="w-full bg-gray-200 rounded-full h-2.5 mb-8">
-                    <div
-                        className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                        style={{ width: `${progress}%` }}
-                    ></div>
-                </div>
+                <div className="bg-white rounded-2xl shadow-lg p-8">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6 leading-snug">{mainQuestion}</h2>
 
-                {/* Question Card */}
-                <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-                    <div className="p-8">
-                        {(() => {
-                            const { mainQuestion, followUp } = parseQuestion(currentQuestion.question_text);
-                            return (
-                                <>
-                                    <h2 className="text-2xl font-bold text-gray-900 mb-6 leading-snug">
-                                        {mainQuestion}
-                                    </h2>
-
-                                    <div className="space-y-4 mb-6">
-                                        {currentQuestion.response_options.map((option, idx) => (
-                                            <button
-                                                key={idx}
-                                                onClick={() => handleAnswer(option.value)}
-                                                className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${answers[currentQuestionIndex] === option.value
-                                                    ? 'border-indigo-600 bg-indigo-50 text-indigo-900'
-                                                    : 'border-gray-100 hover:border-indigo-200 hover:bg-gray-50 text-gray-700'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center">
-                                                    <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center mr-4 ${answers[currentQuestionIndex] === option.value
-                                                        ? 'border-indigo-600 bg-indigo-600'
-                                                        : 'border-gray-300'
-                                                        }`}>
-                                                        {answers[currentQuestionIndex] === option.value && (
-                                                            <div className="h-2.5 w-2.5 rounded-full bg-white"></div>
-                                                        )}
-                                                    </div>
-                                                    <span className="font-medium">{option.label}</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {followUp && (
-                                        <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                            <p className="text-sm font-semibold text-gray-700 mb-3">
-                                                Follow-up: {followUp}
-                                            </p>
-                                            <textarea
-                                                value={comments[currentQuestionIndex] || ''}
-                                                onChange={(e) => handleComment(e.target.value)}
-                                                placeholder="Your thoughts..."
-                                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none text-sm"
-                                                rows={3}
-                                            />
-                                        </div>
-                                    )}
-                                </>
-                            );
-                        })()}
+                    <div className="space-y-3 mb-6">
+                        {currentQData.response_options.map((option, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => handleAnswer(option.value)}
+                                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${answers[currentGlobalIndex] === option.value
+                                    ? 'border-indigo-600 bg-indigo-50 text-indigo-900'
+                                    : 'border-gray-100 hover:border-indigo-200 text-gray-700'
+                                    }`}
+                            >
+                                <span className="font-medium">{option.label}</span>
+                            </button>
+                        ))}
                     </div>
 
-                    <div className="bg-gray-50 px-8 py-6 flex justify-between items-center border-t border-gray-100">
+                    {followUp && (
+                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 mt-4">
+                            <p className="text-sm font-bold text-gray-700 mb-2">Follow-up: {followUp}</p>
+                            <textarea
+                                value={comments[currentGlobalIndex] || ''}
+                                onChange={(e) => handleComment(e.target.value)}
+                                className="w-full p-2 border rounded"
+                                placeholder="Your thoughts..."
+                            />
+                        </div>
+                    )}
+
+                    <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
                         <button
-                            onClick={handlePrevious}
                             disabled={currentQuestionIndex === 0}
-                            className={`text-gray-600 font-medium hover:text-gray-900 ${currentQuestionIndex === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                                }`}
+                            onClick={handlePrev}
+                            className={`text-gray-600 ${currentQuestionIndex === 0 ? 'opacity-30' : 'hover:text-gray-900'}`}
                         >
                             Previous
                         </button>
                         <button
                             onClick={handleNext}
-                            disabled={answers[currentQuestionIndex] === undefined}
-                            className={`px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg shadow-sm hover:bg-indigo-700 transition-all ${answers[currentQuestionIndex] === undefined
-                                ? 'opacity-50 cursor-not-allowed'
-                                : 'transform hover:-translate-y-0.5'
-                                }`}
+                            disabled={!answers[currentGlobalIndex]}
+                            className={`px-6 py-2 bg-indigo-600 text-white rounded-lg shadow ${!answers[currentGlobalIndex] ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'}`}
                         >
-                            {currentQuestionIndex === questions.length - 1 ? (submitting ? 'Submitting...' : 'Complete') : 'Next Question'}
+                            {currentQuestionIndex === groupedQuestions[activeSection].length - 1 ? 'Finish Section' : 'Next Question'}
                         </button>
                     </div>
                 </div>

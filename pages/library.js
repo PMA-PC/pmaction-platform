@@ -1,323 +1,223 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useApp } from '../lib/context';
-import { supabase } from '../lib/supabaseClient';
-import { fetchLikedVideos, fetchYouTubePlaylists, fetchPlaylistItems } from '../lib/youtube';
+import { generateEducationalContent } from '../lib/services/geminiService';
+import Spinner from '../components/Spinner';
+import { BLOG_POSTS } from '../lib/blogData';
 
-export default function Library() {
+// Constants for the explorer
+const MENTAL_HEALTH_CONDITIONS = [
+    'Anxiety', 'Depression', 'ADHD', 'Autism', 'Bipolar Disorder',
+    'PTSD', 'OCD', 'Eating Disorders', 'Stress', 'Burnout',
+    'Self-Esteem', 'Grief', 'Sleep Issues', 'Social Anxiety'
+];
+const AUDIENCES = ['For Adults', 'For Young Adults', 'For Supporters', 'For Seniors'];
+
+const LibraryPage = () => {
     const router = useRouter();
-    const { user } = useApp();
-    const [savedItems, setSavedItems] = useState([]);
-    const [newItemUrl, setNewItemUrl] = useState('');
-    const [newItemTitle, setNewItemTitle] = useState('');
-    const [newItemType, setNewItemType] = useState('article');
-    const [isAdding, setIsAdding] = useState(false);
+    const { user, addWin } = useApp();
 
-    // YouTube State
-    const [activeTab, setActiveTab] = useState('saved'); // 'saved', 'youtube'
-    const [youtubeConnected, setYoutubeConnected] = useState(false);
-    const [likedVideos, setLikedVideos] = useState([]);
-    const [playlists, setPlaylists] = useState([]);
-    const [loadingYoutube, setLoadingYoutube] = useState(false);
+    // State
+    const [viewingPost, setViewingPost] = useState(null); // If looking at a specific blog post
+    const [audience, setAudience] = useState(AUDIENCES[0]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [expandedCard, setExpandedCard] = useState(null);
+    const [contentCache, setContentCache] = useState({});
+    const [loadingKeys, setLoadingKeys] = useState(new Set());
+    const [readingList, setReadingList] = useState(new Set()); // Local state for demo
 
-    // Load from local storage
-    useEffect(() => {
-        const saved = localStorage.getItem('pmaction_library');
-        if (saved) {
-            setSavedItems(JSON.parse(saved));
+    const filteredConditions = useMemo(() => {
+        if (!searchTerm) {
+            return MENTAL_HEALTH_CONDITIONS;
         }
-    }, []);
+        return MENTAL_HEALTH_CONDITIONS.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [searchTerm]);
 
-    // Save to local storage
-    useEffect(() => {
-        localStorage.setItem('pmaction_library', JSON.stringify(savedItems));
-    }, [savedItems]);
+    const handleToggle = (name) => {
+        const cacheKey = `${name}-${audience}`;
+        if (loadingKeys.has(cacheKey)) return;
 
-    // Check YouTube Connection and Fetch Data
-    useEffect(() => {
-        if (activeTab === 'youtube' && user) {
-            checkYouTubeConnection();
-        }
-    }, [activeTab, user]);
+        const isOpening = expandedCard !== name;
 
-    const checkYouTubeConnection = async () => {
-        setLoadingYoutube(true);
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.provider_token) {
-                setYoutubeConnected(true);
-                // Fetch Data
-                const liked = await fetchLikedVideos(session.provider_token);
-                setLikedVideos(liked);
+        if (isOpening) {
+            setExpandedCard(name);
+            if (!contentCache[cacheKey]) {
+                const fetchContent = async () => {
+                    setLoadingKeys(prev => new Set(prev).add(cacheKey));
+                    try {
+                        const generatedContent = await generateEducationalContent(name, audience);
+                        setContentCache(prev => ({ ...prev, [cacheKey]: generatedContent }));
 
-                const playlistData = await fetchYouTubePlaylists(session.provider_token);
-                setPlaylists(playlistData.playlists);
-            } else {
-                setYoutubeConnected(false);
+                        // Award small XP for exploration? 
+                        // await addWin({ title: 'Explored Topic', xp: 5, ... }) 
+                    } catch (e) {
+                        console.error(e);
+                    } finally {
+                        setLoadingKeys(prev => {
+                            const newKeys = new Set(prev);
+                            newKeys.delete(cacheKey);
+                            return newKeys;
+                        });
+                    }
+                };
+                fetchContent();
             }
-        } catch (error) {
-            console.error('Error checking YouTube:', error);
-        } finally {
-            setLoadingYoutube(false);
+        } else {
+            setExpandedCard(null);
         }
     };
 
-    const handleAddItem = (e) => {
-        e.preventDefault();
-        if (!newItemTitle.trim()) return;
-
-        const item = {
-            id: Date.now(),
-            title: newItemTitle.trim(),
-            url: newItemUrl.trim() || '#',
-            type: newItemType,
-            dateAdded: new Date().toISOString()
-        };
-
-        setSavedItems([item, ...savedItems]);
-        setNewItemTitle('');
-        setNewItemUrl('');
-        setIsAdding(false);
+    const handleAudienceChange = (aud) => {
+        setAudience(aud);
+        setExpandedCard(null);
     };
 
-    const deleteItem = (id) => {
-        setSavedItems(savedItems.filter(item => item.id !== id));
+    const handleToggleReading = (e, post) => {
+        e.stopPropagation();
+        if (!user) {
+            alert('Please login to save articles.');
+            return;
+        }
+        setReadingList(prev => {
+            const next = new Set(prev);
+            if (next.has(post.id)) next.delete(post.id);
+            else next.add(post.id);
+            return next;
+        });
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+        <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
             <Head>
-                <title>Library | PMAction</title>
+                <title>Knowledge Library | PMAction</title>
             </Head>
 
-            <nav className="bg-white shadow-sm sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16 items-center">
-                        <div className="flex items-center cursor-pointer" onClick={() => router.push('/dashboard')}>
-                            <span className="text-2xl mr-2">⬅️</span>
-                            <h1 className="text-xl font-bold text-gray-900">Library</h1>
-                        </div>
-                        {activeTab === 'saved' && (
-                            <button
-                                onClick={() => setIsAdding(!isAdding)}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition"
-                            >
-                                {isAdding ? 'Cancel' : '+ Add Item'}
-                            </button>
-                        )}
-                    </div>
-                </div>
+            <nav className="max-w-7xl mx-auto mb-8">
+                <button
+                    onClick={() => router.back()}
+                    className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
+                >
+                    &larr; Back
+                </button>
             </nav>
 
-            <main className="max-w-4xl mx-auto py-8 px-4">
-                {/* Tabs */}
-                <div className="flex gap-4 mb-8 border-b border-gray-200">
-                    <button
-                        onClick={() => setActiveTab('saved')}
-                        className={`pb-4 px-2 font-bold transition-colors ${activeTab === 'saved' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Saved Items
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('youtube')}
-                        className={`pb-4 px-2 font-bold transition-colors ${activeTab === 'youtube' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        YouTube Activity
-                    </button>
+            <div className="max-w-7xl mx-auto space-y-12 animate-fade-in">
+                <div className="text-center">
+                    <h1 className="text-4xl font-bold text-gray-900">Knowledge Library</h1>
+                    <p className="text-gray-600 mt-2 max-w-3xl mx-auto text-lg">An AI-powered resource for understanding mental health, featuring expert articles and on-demand information tailored to you.</p>
                 </div>
 
-                {activeTab === 'saved' && (
-                    <>
-                        {isAdding && (
-                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8 animate-fade-in-up">
-                                <h2 className="text-lg font-bold mb-4">Save New Item</h2>
-                                <form onSubmit={handleAddItem} className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-1">Title</label>
-                                        <input
-                                            type="text"
-                                            value={newItemTitle}
-                                            onChange={(e) => setNewItemTitle(e.target.value)}
-                                            placeholder="Article or Quiz Title"
-                                            className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                            autoFocus
-                                        />
+                {/* Featured Articles Section */}
+                <section>
+                    <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">Featured Articles</h2>
+                    <div className="grid md:grid-cols-3 gap-6">
+                        {BLOG_POSTS.slice(0, 3).map(post => (
+                            <div key={post.id} className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col group h-full border border-gray-100 hover:shadow-xl transition-all">
+                                {post.imageUrl && <img src={post.imageUrl} alt="" className="w-full h-40 object-cover" />}
+                                <div className="p-6 flex flex-col flex-grow">
+                                    <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-brand-primary transition-colors">{post.title}</h3>
+                                    <p className="text-sm text-gray-500 mb-3">By {post.author} • {post.date}</p>
+                                    <p className="text-gray-600 mb-4 flex-grow text-sm line-clamp-3">{post.description || post.content.substring(0, 100)}...</p>
+                                    <div className="mt-auto flex items-center justify-between">
+                                        <button onClick={() => router.push(`/blog/${post.id}`)} className="font-semibold text-brand-primary hover:text-green-800">Read More &rarr;</button>
+                                        {user && (
+                                            <button onClick={(e) => handleToggleReading(e, post)} className={`text-2xl transition-colors ${readingList.has(post.id) ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'}`} aria-label="Save to reading list">
+                                                ★
+                                            </button>
+                                        )}
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-1">URL (Optional)</label>
-                                        <input
-                                            type="url"
-                                            value={newItemUrl}
-                                            onChange={(e) => setNewItemUrl(e.target.value)}
-                                            placeholder="https://..."
-                                            className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-1">Type</label>
-                                        <div className="flex gap-4">
-                                            {['article', 'quiz', 'video', 'book'].map(type => (
-                                                <label key={type} className="flex items-center cursor-pointer">
-                                                    <input
-                                                        type="radio"
-                                                        name="type"
-                                                        value={type}
-                                                        checked={newItemType === type}
-                                                        onChange={(e) => setNewItemType(e.target.value)}
-                                                        className="mr-2 text-blue-600 focus:ring-blue-500"
-                                                    />
-                                                    <span className="capitalize text-gray-700">{type}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end pt-4">
-                                        <button
-                                            type="submit"
-                                            disabled={!newItemTitle.trim()}
-                                            className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 transition"
-                                        >
-                                            Save Item
-                                        </button>
-                                    </div>
-                                </form>
+                                </div>
                             </div>
-                        )}
+                        ))}
+                    </div>
+                </section>
 
-                        {savedItems.length === 0 ? (
-                            <div className="text-center py-12">
-                                <div className="text-6xl mb-4">📚</div>
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">Your Library is Empty</h3>
-                                <p className="text-gray-500">Save articles, quizzes, and resources here for later.</p>
-                            </div>
-                        ) : (
-                            <div className="grid gap-4">
-                                {savedItems.map(item => (
-                                    <div key={item.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between group hover:border-blue-200 transition-all">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl">
-                                                {item.type === 'article' ? '📄' :
-                                                    item.type === 'quiz' ? '❓' :
-                                                        item.type === 'video' ? '▶️' : '📖'}
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-gray-800 text-lg">
-                                                    {item.url !== '#' ? (
-                                                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 hover:underline">
-                                                            {item.title}
-                                                        </a>
-                                                    ) : (
-                                                        item.title
-                                                    )}
-                                                </h3>
-                                                <div className="flex items-center gap-2 text-sm text-gray-500">
-                                                    <span className="capitalize bg-gray-100 px-2 py-0.5 rounded text-xs font-bold">{item.type}</span>
-                                                    <span>• Added {new Date(item.dateAdded).toLocaleDateString()}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => deleteItem(item.id)}
-                                            className="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-all"
-                                            title="Remove"
-                                        >
-                                            🗑️
-                                        </button>
-                                    </div>
+                {/* AI Topic Explorer Section */}
+                <section className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+                    <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center flex justify-center items-center gap-2">
+                        <span>🧠</span> AI Topic Explorer
+                    </h2>
+                    <p className="text-center text-gray-600 mt-2 mb-8 max-w-3xl mx-auto">Can't find what you're looking for? Select an audience and generate a detailed educational article on a specific topic instantly.</p>
+
+                    <div className="sticky top-4 bg-white/95 backdrop-blur z-10 py-4 mb-6 border-b border-gray-100 pb-6">
+                        <div className="flex flex-col md:flex-row gap-4 max-w-4xl mx-auto">
+                            <input
+                                type="search"
+                                placeholder="Search for a condition..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="flex-grow p-3 border-2 border-gray-200 rounded-full focus:ring-2 focus:ring-brand-primary outline-none"
+                            />
+                            <div className="flex justify-center items-center gap-2 flex-wrap p-1 bg-gray-100 rounded-full">
+                                {AUDIENCES.map(aud => (
+                                    <button
+                                        key={aud}
+                                        onClick={() => handleAudienceChange(aud)}
+                                        className={`px-4 py-2 rounded-full font-semibold transition-all text-sm flex-grow md:flex-grow-0 ${audience === aud ? 'bg-brand-primary text-white shadow-md' : 'bg-transparent text-gray-700 hover:bg-white'}`}
+                                    >
+                                        {aud}
+                                    </button>
                                 ))}
                             </div>
-                        )}
-                    </>
-                )}
+                        </div>
+                    </div>
 
-                {activeTab === 'youtube' && (
-                    <div className="space-y-8">
-                        {!youtubeConnected ? (
-                            <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
-                                <div className="text-6xl mb-4">📺</div>
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">Connect YouTube</h3>
-                                <p className="text-gray-500 mb-6">Sign in with Google to see your Liked Videos and Playlists.</p>
-                                <p className="text-xs text-gray-400">Note: You may need to sign out and sign back in to grant permissions.</p>
-                            </div>
-                        ) : loadingYoutube ? (
-                            <div className="text-center py-12">
-                                <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin mx-auto mb-4"></div>
-                                <p className="text-gray-500">Loading YouTube data...</p>
-                            </div>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredConditions.length > 0 ? (
+                            filteredConditions.map(name => {
+                                const isExpanded = expandedCard === name;
+                                const cacheKey = `${name}-${audience}`;
+                                const isLoadingThisCard = loadingKeys.has(cacheKey);
+                                return (
+                                    <div key={name} className={`bg-gray-50 rounded-xl shadow-sm border border-gray-100 flex flex-col transition-all duration-300 ${isExpanded ? 'lg:col-span-2 row-span-2' : ''}`}>
+                                        <div className="p-6 flex-grow flex flex-col justify-center">
+                                            <h3 className="text-xl font-bold text-gray-800 mb-2">{name}</h3>
+                                            <p className="text-xs text-gray-500 uppercase tracking-wide">Topic</p>
+                                        </div>
+                                        <div className="px-6 py-4 mt-auto border-t border-gray-200">
+                                            <button
+                                                onClick={() => handleToggle(name)}
+                                                className={`w-full text-center font-bold py-2 rounded-lg transition-colors ${isExpanded ? 'bg-gray-200 text-gray-800' : 'bg-white text-brand-primary shadow-sm hover:bg-green-50'}`}
+                                                aria-expanded={isExpanded}
+                                                aria-controls={`content-${name}`}
+                                            >
+                                                {isLoadingThisCard
+                                                    ? 'Generating...'
+                                                    : isExpanded
+                                                        ? 'Close Info'
+                                                        : `Explore`}
+                                            </button>
+                                        </div>
+                                        {isExpanded && (
+                                            <div id={`content-${name}`} className="px-8 pb-8 border-t border-gray-200 animate-fade-in bg-white rounded-b-xl">
+                                                {isLoadingThisCard ? (
+                                                    <div className="flex justify-center py-8"><Spinner /></div>
+                                                ) : (
+                                                    <div className="prose max-w-none prose-slate mt-4">
+                                                        <h4 className="text-lg font-bold text-brand-primary mb-4">Perspective: {audience}</h4>
+                                                        <p className="whitespace-pre-line text-gray-700 leading-relaxed">{contentCache[cacheKey]}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })
                         ) : (
-                            <>
-                                {/* Liked Videos */}
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                        <span className="text-red-600">👍</span> Liked Videos
-                                    </h2>
-                                    {likedVideos.length === 0 ? (
-                                        <p className="text-gray-500 italic">No liked videos found.</p>
-                                    ) : (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            {likedVideos.map(video => (
-                                                <a
-                                                    key={video.id}
-                                                    href={video.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group"
-                                                >
-                                                    <div className="relative aspect-video bg-gray-100">
-                                                        {video.thumbnail && (
-                                                            <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
-                                                        )}
-                                                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all flex items-center justify-center">
-                                                            <span className="text-white opacity-0 group-hover:opacity-100 text-4xl">▶️</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="p-4">
-                                                        <h3 className="font-bold text-gray-800 line-clamp-2 mb-1">{video.title}</h3>
-                                                        <p className="text-xs text-gray-500">{video.channel}</p>
-                                                    </div>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Playlists */}
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                        <span className="text-red-600">📑</span> Playlists
-                                    </h2>
-                                    {playlists.length === 0 ? (
-                                        <p className="text-gray-500 italic">No playlists found.</p>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {playlists.map(playlist => (
-                                                <div key={playlist.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="text-2xl">📑</div>
-                                                        <div>
-                                                            <h3 className="font-bold text-gray-800">{playlist.snippet.title}</h3>
-                                                            <p className="text-xs text-gray-500">{playlist.contentDetails.itemCount} videos</p>
-                                                        </div>
-                                                    </div>
-                                                    <a
-                                                        href={`https://www.youtube.com/playlist?list=${playlist.id}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-600 font-bold text-sm hover:underline"
-                                                    >
-                                                        View Playlist
-                                                    </a>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </>
+                            <div className="text-center text-gray-600 py-8 md:col-span-3 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                                <p>No conditions found matching "{searchTerm}".</p>
+                            </div>
                         )}
                     </div>
-                )}
-            </main>
+                </section>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center text-sm text-blue-800 max-w-3xl mx-auto">
+                    <strong>Medical Disclaimer:</strong> This content is generated by AI for educational purposes only. It is not professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider.
+                </div>
+            </div>
         </div>
     );
-}
+};
+
+export default LibraryPage;

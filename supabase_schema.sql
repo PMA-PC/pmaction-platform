@@ -364,11 +364,13 @@ CREATE TABLE assessment_questions (
     question_text TEXT NOT NULL,
     response_type TEXT DEFAULT 'likert' CHECK (response_type IN ('likert', 'yes_no', 'multiple_choice')),
     response_options JSONB NOT NULL,
+    section TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(assessment_id, question_number)
 );
 
 CREATE INDEX idx_assessment_questions_assessment ON assessment_questions(assessment_id, question_number);
+CREATE INDEX idx_assessment_questions_section ON assessment_questions(assessment_id, section);
 
 -- User assessments
 CREATE TABLE user_assessments (

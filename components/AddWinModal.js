@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { SELF_CARE_ACTIVITIES, SELF_CARE_CATEGORIES } from '../lib/selfCareData';
+import { useApp } from '../lib/context';
 
 const WIN_TYPES = {
     ACTIVITY: 'activity',
+    MOOD: 'mood',
     JOURNAL: 'journal',
     GRATITUDE: 'gratitude',
     SELF_CARE: 'self_care'
@@ -19,12 +21,28 @@ const ACTIVITIES = [
     { id: 'sleep', label: 'Good Sleep', icon: '😴', xp: 10, benefit: 'Well done! Rest is essential for emotional regulation.' }
 ];
 
-export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
-    const [activeTab, setActiveTab] = useState(WIN_TYPES.ACTIVITY);
-    const [selectedActivity, setSelectedActivity] = useState(null);
+const EMOTION_LAYERS = {
+    'Joy': ['Happy', 'Excited', 'Grateful', 'Proud', 'Optimistic', 'Content', 'Relieved'],
+    'Sadness': ['Lonely', 'Depressed', 'Hurt', 'Disappointed', 'Grief', 'Tired', 'Gloomy'],
+    'Anger': ['Frustrated', 'Annoyed', 'Resentful', 'Furious', 'Jealous', 'Irritated'],
+    'Fear': ['Anxious', 'Insecure', 'Overwhelmed', 'Scared', 'Worried', 'Panic'],
+    'Disgust': ['Disapproving', 'Disappointed', 'Awful', 'Avoidance', 'Sick'],
+    'Surprise': ['Startled', 'Confused', 'Amazed', 'Excited', 'Shocked']
+};
+
+const BODY_TAGS = ['#headache', '#back_pain', '#stomach', '#chest', '#legs', '#neck', '#fatigue', '#tension'];
+const JOURNAL_TAGS = ['#anxiety', '#focus', '#win', '#family', '#work', '#sleep', '#grateful', '#stress'];
+
+export default function AddWinModal({ isOpen, onClose, initialTab = WIN_TYPES.ACTIVITY }) {
+    const { addWin } = useApp();
+    const [activeTab, setActiveTab] = useState(initialTab);
+    const [selectedActivities, setSelectedActivities] = useState([]);
     const [journalText, setJournalText] = useState('');
     const [gratitudeList, setGratitudeList] = useState(['', '', '']);
     const [showSuccess, setShowSuccess] = useState(false);
+
+    // Mood State
+    const [selectedPrimaryEmotion, setSelectedPrimaryEmotion] = useState(null);
 
     // Self-Care State
     const [selectedSelfCare, setSelectedSelfCare] = useState(null);
@@ -35,103 +53,120 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
 
     useEffect(() => {
         if (isOpen && initialTab) {
-            // Map initialTab string to WIN_TYPES
             const type = Object.values(WIN_TYPES).find(t => t === initialTab);
             if (type) setActiveTab(type);
+        } else if (isOpen) {
+            setActiveTab(WIN_TYPES.ACTIVITY);
+        }
+        // Reset mood state on open
+        if (isOpen) {
+            setSelectedPrimaryEmotion(null);
         }
     }, [isOpen, initialTab]);
 
     if (!isOpen) return null;
 
+    const toggleActivity = (activity) => {
+        if (selectedActivities.find(a => a.id === activity.id)) {
+            setSelectedActivities(selectedActivities.filter(a => a.id !== activity.id));
+        } else {
+            setSelectedActivities([...selectedActivities, activity]);
+        }
+    };
+
+    const handleEmotionSelect = (emotion, isPrimary) => {
+        if (isPrimary) {
+            setSelectedPrimaryEmotion(emotion);
+        } else {
+            setJournalText(prev => {
+                const prefix = prev && !prev.startsWith('Mood:') ? prev + '\n' : '';
+                return `${prefix}Mood: ${selectedPrimaryEmotion} (${emotion}) - `;
+            });
+        }
+    };
+
     const handleSubmit = async () => {
         setIsSubmitting(true);
-        let winData = {
-            type: activeTab,
-            timestamp: new Date().toISOString()
-        };
-
-        switch (activeTab) {
-            case WIN_TYPES.ACTIVITY:
-                if (!selectedActivity) {
-                    setIsSubmitting(false);
-                    return;
-                }
-                winData = {
-                    ...winData,
-                    activity_type: selectedActivity.id,
-                    label: selectedActivity.label,
-                    icon: selectedActivity.icon,
-                    xp: selectedActivity.xp,
-                    benefit: selectedActivity.benefit // Pass benefit for potential future use
-                };
-                break;
-            case WIN_TYPES.JOURNAL:
-                if (!journalText.trim()) {
-                    setIsSubmitting(false);
-                    return;
-                }
-                winData = {
-                    ...winData,
-                    content: journalText,
-                    xp: 15
-                };
-                break;
-            case WIN_TYPES.GRATITUDE:
-                const filledGratitudes = gratitudeList.filter(g => g.trim());
-                if (filledGratitudes.length === 0) {
-                    setIsSubmitting(false);
-                    return;
-                }
-                winData = {
-                    ...winData,
-                    content: filledGratitudes,
-                    xp: 20
-                };
-                break;
-            case WIN_TYPES.SELF_CARE:
-                if (!selectedSelfCare) {
-                    setIsSubmitting(false);
-                    return;
-                }
-                winData = {
-                    ...winData,
-                    type: 'journal', // Log as journal entry for now to show in "Recent Thoughts"
-                    content: `Completed self-care activity: ${selectedSelfCare.label}`,
-                    label: selectedSelfCare.label,
-                    icon: '🧘',
-                    xp: selectedSelfCare.xp
-                };
-                break;
-        }
 
         try {
-            await onAddWin(winData);
+            if (activeTab === WIN_TYPES.ACTIVITY) {
+                if (selectedActivities.length === 0) {
+                    setIsSubmitting(false);
+                    return;
+                }
+                for (const activity of selectedActivities) {
+                    const winData = {
+                        type: WIN_TYPES.ACTIVITY,
+                        timestamp: new Date().toISOString(),
+                        activity_type: activity.id,
+                        label: activity.label,
+                        icon: activity.icon,
+                        xp: activity.xp,
+                        benefit: activity.benefit
+                    };
+                    await addWin(winData);
+                }
+            } else {
+                let winData = {
+                    type: activeTab === WIN_TYPES.MOOD ? 'journal' : activeTab,
+                    timestamp: new Date().toISOString()
+                };
+
+                switch (activeTab) {
+                    case WIN_TYPES.MOOD:
+                        if (!journalText.trim()) return;
+                        winData = { ...winData, content: journalText, xp: 15, label: 'Mood Check-in', icon: '🎭' };
+                        break;
+                    case WIN_TYPES.JOURNAL:
+                        if (!journalText.trim()) return;
+                        winData = { ...winData, content: journalText, xp: 15 };
+                        break;
+                    case WIN_TYPES.GRATITUDE:
+                        const filledGratitudes = gratitudeList.filter(g => g.trim());
+                        if (filledGratitudes.length === 0) return;
+                        winData = { ...winData, content: filledGratitudes, xp: 20 };
+                        break;
+                    case WIN_TYPES.SELF_CARE:
+                        if (!selectedSelfCare) return;
+                        winData = {
+                            ...winData,
+                            type: 'journal',
+                            content: `Completed self-care activity: ${selectedSelfCare.label}`,
+                            label: selectedSelfCare.label,
+                            icon: '🧘',
+                            xp: selectedSelfCare.xp,
+                            win_type: 'self_care'
+                        };
+                        break;
+                }
+                await addWin(winData);
+            }
             setShowSuccess(true);
         } catch (error) {
             console.error("Failed to add win:", error);
-            // Optionally show error to user
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const resetForm = () => {
-        setSelectedActivity(null);
+        setSelectedActivities([]);
         setJournalText('');
         setGratitudeList(['', '', '']);
         setSelectedSelfCare(null);
         setFilterTime('');
         setFilterCost('');
+        setSelectedPrimaryEmotion(null);
         setActiveTab(WIN_TYPES.ACTIVITY);
         setShowSuccess(false);
     };
 
     const handleAddAnother = () => {
-        // Reset specific fields but keep modal open
-        setSelectedActivity(null);
+        setSelectedActivities([]);
         setJournalText('');
         setGratitudeList(['', '', '']);
         setSelectedSelfCare(null);
+        setSelectedPrimaryEmotion(null);
         setShowSuccess(false);
     };
 
@@ -140,7 +175,6 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
         onClose();
     };
 
-    // Filter Self-Care Activities
     const filteredSelfCare = SELF_CARE_ACTIVITIES.filter(activity => {
         if (filterTime && activity.time !== filterTime) return false;
         if (filterCost && activity.cost !== filterCost) return false;
@@ -152,12 +186,13 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-fade-in-up p-6 text-center">
                     <div className="mb-4 text-5xl">🎉</div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Win Logged!</h2>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Wins Logged!</h2>
 
-                    {activeTab === WIN_TYPES.ACTIVITY && selectedActivity && (
+                    {activeTab === WIN_TYPES.ACTIVITY && selectedActivities.length > 0 && (
                         <div className="bg-blue-50 p-4 rounded-xl mb-6 border border-blue-100">
                             <p className="text-blue-800 font-medium italic">
-                                "{selectedActivity.benefit}"
+                                "{selectedActivities[0].benefit}"
+                                {selectedActivities.length > 1 && <span className="block text-xs mt-1 not-italic opacity-75">(and {selectedActivities.length - 1} more)</span>}
                             </p>
                         </div>
                     )}
@@ -191,7 +226,7 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
                 {/* Header */}
                 <div className="bg-blue-600 p-6 text-white flex justify-between items-center shrink-0">
                     <div>
-                        <h2 className="text-2xl font-bold">Log a Win</h2>
+                        <h2 className="text-2xl font-bold">PMA Log</h2>
                         <p className="text-blue-100 text-sm">Every positive action counts!</p>
                     </div>
                     <button onClick={onClose} className="text-white hover:bg-blue-700 p-2 rounded-full transition">
@@ -219,21 +254,122 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
                 <div className="p-6 overflow-y-auto flex-1">
                     {activeTab === WIN_TYPES.ACTIVITY && (
                         <div className="flex flex-col gap-4">
+                            <p className="text-sm text-gray-500 font-medium">Select all that apply:</p>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                {ACTIVITIES.map(activity => (
+                                {ACTIVITIES.map(activity => {
+                                    const isSelected = selectedActivities.find(a => a.id === activity.id);
+                                    return (
+                                        <button
+                                            key={activity.id}
+                                            onClick={() => toggleActivity(activity)}
+                                            className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${isSelected
+                                                ? 'border-blue-500 bg-blue-50 shadow-md scale-105'
+                                                : 'border-gray-100 hover:border-blue-200 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <span className="text-4xl mb-2">{activity.icon}</span>
+                                            <span className="text-xs font-bold text-center text-gray-700">{activity.label}</span>
+                                            <span className="text-[10px] font-bold text-blue-500 mt-1">+{activity.xp} XP</span>
+                                            {isSelected && <div className="absolute top-2 right-2 w-4 h-4 bg-blue-500 rounded-full text-white text-[10px] flex items-center justify-center">✓</div>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-xs text-gray-400 text-center mt-4 italic">
+                                * You can add or update these in <button onClick={() => window.location.href = '/settings'} className="underline hover:text-blue-500">Settings</button>
+                            </p>
+                        </div>
+                    )}
+
+                    {activeTab === WIN_TYPES.MOOD && (
+                        <div className="space-y-4">
+                            <div className="text-center mb-4">
+                                <h3 className="text-lg font-bold text-gray-800">
+                                    {selectedPrimaryEmotion ? `How does ${selectedPrimaryEmotion} feel?` : 'How are you feeling?'}
+                                </h3>
+                                <p className="text-xs text-gray-500">
+                                    {selectedPrimaryEmotion ? 'Select a specific emotion.' : 'Select an emotion to start your check-in.'}
+                                </p>
+                                {selectedPrimaryEmotion && (
                                     <button
-                                        key={activity.id}
-                                        onClick={() => setSelectedActivity(activity)}
-                                        className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${selectedActivity?.id === activity.id
-                                            ? 'border-blue-500 bg-blue-50 shadow-md scale-105'
-                                            : 'border-gray-100 hover:border-blue-200 hover:bg-gray-50'
-                                            }`}
+                                        onClick={() => setSelectedPrimaryEmotion(null)}
+                                        className="text-xs text-blue-500 underline mt-1"
                                     >
-                                        <span className="text-4xl mb-2">{activity.icon}</span>
-                                        <span className="text-xs font-bold text-center text-gray-700">{activity.label}</span>
-                                        <span className="text-[10px] font-bold text-blue-500 mt-1">+{activity.xp} XP</span>
+                                        ← Back to all emotions
                                     </button>
-                                ))}
+                                )}
+                            </div>
+
+                            {/* Feelings Wheel / Grid */}
+                            {!selectedPrimaryEmotion ? (
+                                <div className="grid grid-cols-3 gap-3 mb-4">
+                                    {[
+                                        { label: 'Joy', icon: '😄', color: 'bg-yellow-100 border-yellow-400 text-yellow-800' },
+                                        { label: 'Sadness', icon: '😢', color: 'bg-blue-100 border-blue-400 text-blue-800' },
+                                        { label: 'Anger', icon: '😠', color: 'bg-red-100 border-red-400 text-red-800' },
+                                        { label: 'Fear', icon: '😨', color: 'bg-purple-100 border-purple-400 text-purple-800' },
+                                        { label: 'Disgust', icon: '🤢', color: 'bg-green-100 border-green-400 text-green-800' },
+                                        { label: 'Surprise', icon: '😲', color: 'bg-orange-100 border-orange-400 text-orange-800' }
+                                    ].map(emotion => (
+                                        <button
+                                            key={emotion.label}
+                                            onClick={() => handleEmotionSelect(emotion.label, true)}
+                                            className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center transition-all hover:scale-105 ${emotion.color} opacity-90 hover:opacity-100`}
+                                        >
+                                            <span className="text-2xl mb-1">{emotion.icon}</span>
+                                            <span className="text-xs font-bold">{emotion.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-3 gap-3 mb-4 animate-fade-in-up">
+                                    {EMOTION_LAYERS[selectedPrimaryEmotion].map(subEmotion => (
+                                        <button
+                                            key={subEmotion}
+                                            onClick={() => handleEmotionSelect(subEmotion, false)}
+                                            className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50 transition-all text-sm font-medium text-gray-700"
+                                        >
+                                            {subEmotion}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            <textarea
+                                value={journalText}
+                                onChange={(e) => setJournalText(e.target.value)}
+                                placeholder="Elaborate on your feelings (optional)..."
+                                className="w-full h-24 p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none text-gray-700 text-sm"
+                            />
+
+                            {/* Hashtags - Two Rows */}
+                            <div className="space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                    {JOURNAL_TAGS.map(tag => (
+                                        <button
+                                            key={tag}
+                                            onClick={() => setJournalText(prev => prev + (prev ? ' ' : '') + tag)}
+                                            className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition-colors"
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {BODY_TAGS.map(tag => (
+                                        <button
+                                            key={tag}
+                                            onClick={() => setJournalText(prev => prev + (prev ? ' ' : '') + tag)}
+                                            className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg hover:bg-purple-100 transition-colors"
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="text-right text-xs text-gray-400">
+                                +15 XP
                             </div>
                         </div>
                     )}
@@ -243,10 +379,23 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
                             <textarea
                                 value={journalText}
                                 onChange={(e) => setJournalText(e.target.value)}
-                                placeholder="What's on your mind? (Auto-tags: #work, #family)..."
-                                className="w-full h-40 p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none text-gray-700"
+                                placeholder="What's on your mind?..."
+                                className="w-full h-32 p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none text-gray-700 mb-2"
                             />
-                            <div className="mt-2 text-right text-xs text-gray-400">
+
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {JOURNAL_TAGS.map(tag => (
+                                    <button
+                                        key={tag}
+                                        onClick={() => setJournalText(prev => prev + (prev ? ' ' : '') + tag)}
+                                        className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg hover:bg-blue-100 transition-colors"
+                                    >
+                                        {tag}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="text-right text-xs text-gray-400">
                                 +15 XP
                             </div>
                         </div>
@@ -254,24 +403,24 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
 
                     {activeTab === WIN_TYPES.GRATITUDE && (
                         <div className="space-y-4">
-                            <p className="text-gray-600 font-medium mb-2">I am grateful for...</p>
-                            {gratitudeList.map((text, index) => (
+                            <p className="text-sm text-gray-500 font-medium">I am grateful for...</p>
+                            {gratitudeList.map((item, index) => (
                                 <div key={index} className="flex items-center gap-3">
                                     <span className="text-blue-500 font-bold">{index + 1}.</span>
                                     <input
                                         type="text"
-                                        value={text}
+                                        value={item}
                                         onChange={(e) => {
                                             const newList = [...gratitudeList];
                                             newList[index] = e.target.value;
                                             setGratitudeList(newList);
                                         }}
+                                        placeholder="Enter something you're grateful for"
                                         className="flex-1 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                        placeholder="Something specific..."
                                     />
                                 </div>
                             ))}
-                            <div className="mt-2 text-right text-xs text-gray-400">
+                            <div className="text-right text-xs text-gray-400">
                                 +20 XP
                             </div>
                         </div>
@@ -279,7 +428,7 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
 
                     {activeTab === WIN_TYPES.SELF_CARE && (
                         <div className="space-y-4">
-                            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                            <div className="flex gap-2 mb-4">
                                 <select
                                     value={filterTime}
                                     onChange={(e) => setFilterTime(e.target.value)}
@@ -294,7 +443,7 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
                                     className="p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                 >
                                     <option value="">All Costs</option>
-                                    {SELF_CARE_CATEGORIES.COST.map(c => <option key={c} value={c}>{c}</option>)}
+                                    {SELF_CARE_CATEGORIES.COST && SELF_CARE_CATEGORIES.COST.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
                             </div>
 
@@ -306,20 +455,16 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
                                         <button
                                             key={activity.id}
                                             onClick={() => setSelectedSelfCare(activity)}
-                                            className={`w-full flex items-center p-3 rounded-xl border-2 transition-all text-left ${selectedSelfCare?.id === activity.id
+                                            className={`w-full text-left p-3 rounded-xl border transition-all flex justify-between items-center ${selectedSelfCare?.id === activity.id
                                                 ? 'border-purple-500 bg-purple-50 shadow-sm'
-                                                : 'border-gray-100 hover:border-purple-200'
+                                                : 'border-gray-100 hover:border-purple-200 hover:bg-gray-50'
                                                 }`}
                                         >
-                                            <div className="flex-1">
+                                            <div>
                                                 <div className="font-bold text-gray-800">{activity.label}</div>
-                                                <div className="text-xs text-gray-500 flex gap-2 mt-1">
-                                                    <span className="bg-gray-100 px-1.5 rounded">{activity.category}</span>
-                                                    <span className="bg-gray-100 px-1.5 rounded">{activity.time}</span>
-                                                    <span className="bg-gray-100 px-1.5 rounded">{activity.cost}</span>
-                                                </div>
+                                                <div className="text-xs text-gray-500">{activity.time} • +{activity.xp} XP</div>
                                             </div>
-                                            <span className="ml-2 text-xs font-bold text-purple-600">+{activity.xp} XP</span>
+                                            {selectedSelfCare?.id === activity.id && <span className="text-purple-600 font-bold">✓</span>}
                                         </button>
                                     ))
                                 )}
@@ -329,27 +474,16 @@ export default function AddWinModal({ isOpen, onClose, onAddWin, initialTab }) {
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end shrink-0">
-                    <button
-                        onClick={onClose}
-                        className="px-6 py-2 text-gray-500 font-bold hover:text-gray-700 mr-4"
-                    >
-                        Cancel
-                    </button>
+                <div className="p-6 border-t border-gray-100 shrink-0">
                     <button
                         onClick={handleSubmit}
-                        disabled={
-                            (activeTab === WIN_TYPES.ACTIVITY && !selectedActivity) ||
-                            (activeTab === WIN_TYPES.JOURNAL && !journalText.trim()) ||
-                            (activeTab === WIN_TYPES.GRATITUDE && !gratitudeList.some(g => g.trim())) ||
-                            (activeTab === WIN_TYPES.SELF_CARE && !selectedSelfCare)
-                        }
-                        className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 transition-all"
+                        disabled={isSubmitting}
+                        className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isSubmitting ? 'Claiming...' : 'Claim Win!'}
+                        {isSubmitting ? 'Saving...' : 'Claim Win!'}
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

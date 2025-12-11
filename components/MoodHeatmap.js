@@ -1,75 +1,50 @@
 import React from 'react';
 
-const MoodHeatmap = ({ data }) => {
-    // data format: [{ date: '2023-10-27', mood: 4 }, ...]
-
-    // Helper to get color based on mood
-    const getMoodColor = (mood) => {
-        if (!mood) return 'bg-gray-100'; // No data
-        if (mood >= 4.5) return 'bg-green-500'; // Amazing
-        if (mood >= 4) return 'bg-green-400'; // Good
-        if (mood >= 3) return 'bg-yellow-400'; // Okay
-        if (mood >= 2) return 'bg-orange-400'; // Bad
-        return 'bg-red-500'; // Terrible
-    };
-
-    // Generate last 30 days for the heatmap
-    const generateDays = () => {
-        const days = [];
-        const today = new Date();
-        for (let i = 29; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(today.getDate() - i);
-            const dateStr = d.toLocaleDateString(); // Simplified for matching
-
-            // Find mood for this day
-            // Note: In a real app, ensure date formats match perfectly (e.g., YYYY-MM-DD)
-            // Here we assume data.date matches d.toLocaleDateString() or we need to normalize
-            const entry = data.find(item => {
-                const itemDate = new Date(item.date);
-                return itemDate.getDate() === d.getDate() &&
-                    itemDate.getMonth() === d.getMonth();
-            });
-
-            days.push({
-                date: d,
-                mood: entry ? entry.mood : null
-            });
+export const MoodHeatmap = ({ moods }) => {
+    // Simplified representation.
+    const moodColor = (value) => {
+        switch (value) {
+            case 1: return 'bg-red-300';
+            case 2: return 'bg-yellow-300';
+            case 3: return 'bg-blue-300';
+            case 4: return 'bg-green-300';
+            case 5: return 'bg-green-500';
+            default: return 'bg-gray-200';
         }
-        return days;
-    };
+    }
 
-    const days = generateDays();
+    const moodData = {};
+    if (moods) {
+        moods.forEach(mood => {
+            const date = new Date(mood.date).toISOString().split('T')[0];
+            // Use the last mood value for the day for simplicity
+            moodData[date] = mood.mood?.value || 0;
+        });
+    }
+
+    const today = new Date();
+    const days = Array.from({ length: 90 }, (_, i) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        return d;
+    }).reverse();
 
     return (
-        <div className="w-full">
-            <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
-                {days.map((day, index) => (
-                    <div
-                        key={index}
-                        className={`w-8 h-8 rounded-md ${getMoodColor(day.mood)} transition-all hover:scale-110 relative group cursor-default`}
-                    >
-                        {/* Tooltip */}
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                            {day.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                            {day.mood && ` - Mood: ${day.mood}`}
-                        </div>
-                    </div>
-                ))}
-            </div>
-            <div className="mt-4 flex items-center gap-4 text-xs text-gray-500 justify-center sm:justify-start">
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded bg-red-500"></div> Low
-                </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded bg-yellow-400"></div> Med
-                </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded bg-green-500"></div> High
-                </div>
+        <div className="p-4 bg-white rounded-lg shadow border border-gray-100">
+            <h3 className="font-bold text-lg mb-4 text-gray-800">Mood Heatmap (90 Days)</h3>
+            <div className="grid grid-cols-12 gap-1">
+                {days.map(day => {
+                    const dateString = day.toISOString().split('T')[0];
+                    const moodValue = moodData[dateString];
+                    return (
+                        <div
+                            key={dateString}
+                            className={`w-6 h-6 rounded-sm ${moodValue ? moodColor(moodValue) : 'bg-gray-100'}`}
+                            title={moodValue ? `Mood: ${moodValue} on ${day.toLocaleDateString()}` : `No entry on ${day.toLocaleDateString()}`}
+                        />
+                    )
+                })}
             </div>
         </div>
     );
 };
-
-export default MoodHeatmap;

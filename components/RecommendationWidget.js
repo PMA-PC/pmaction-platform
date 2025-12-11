@@ -87,19 +87,14 @@ export default function RecommendationWidget() {
     };
 
     return (
-        <div className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-1 shadow-lg transform hover:scale-[1.02] transition-transform cursor-pointer group">
-            <div className="bg-white rounded-xl p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                        {rec.icon}
-                    </div>
-                    <div>
-                        <p className="text-xs font-bold text-rose-500 uppercase tracking-wider">Recommended for You</p>
-                        <h3 className="font-bold text-gray-900 text-lg">{rec.title}</h3>
-                    </div>
+        <div className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-[2px] shadow-lg transform transition-transform cursor-pointer group min-h-[120px]">
+            <div className="bg-white rounded-xl h-full w-full p-4 flex flex-col items-center justify-center text-center">
+                <div className="text-4xl mb-2 group-hover:scale-110 transition-transform">
+                    {rec.icon}
                 </div>
-                <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-rose-500 group-hover:text-white transition-colors">
-                    ➜
+                <div>
+                    <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1">Recommended</p>
+                    <h3 className="font-bold text-gray-900 text-lg leading-tight">{rec.title}</h3>
                 </div>
             </div>
         </div>

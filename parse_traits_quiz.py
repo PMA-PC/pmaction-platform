@@ -23,9 +23,10 @@ def parse_quiz(input_file, output_file):
     sql_statements.append("    assessment_id_var INTEGER;")
     sql_statements.append("BEGIN")
     sql_statements.append("    SELECT id INTO assessment_id_var FROM assessments WHERE slug = 'neurodiversity-traits';")
+    sql_statements.append("    -- IMPORTANT: Ensure you have added the 'section' column to assessment_questions table before running this!")
     sql_statements.append("")
 
-    current_category = ""
+    current_section = "General"
     question_number = 1
     
     likert_options = json.dumps([
@@ -36,38 +37,6 @@ def parse_quiz(input_file, output_file):
         {"value": 5, "label": "5 - Dominant/Core part"}
     ])
 
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-            
-        if line.startswith(("I. ", "II. ", "III. ", "IV. ", "V. ", "VI. ", "VII. ", "VIII. ")):
-            current_category = line
-            sql_statements.append(f"    -- {current_category}")
-            continue
-
-        # Parse Question: Definition. Example: ...
-        if ":" in line:
-            parts = line.split(":", 1)
-            title = parts[0].strip()
-            rest = parts[1].strip()
-            
-            # Check for example
-            description = rest
-            example = ""
-            if "Example:" in rest:
-                desc_parts = rest.split("Example:", 1)
-                description = desc_parts[0].strip()
-                example = desc_parts[1].strip()
-            
-            # If example is on next line (in raw text it might be)
-            # But my raw text file has Example on new line sometimes? 
-            # Let's handle the case where Example is its own line in the loop
-            # Actually, looking at the raw file, Example is often on a new line.
-            # So I need to handle multi-line parsing.
-            pass
-
-    # Re-doing parsing logic for multi-line
     questions = []
     current_q = None
     
@@ -76,8 +45,12 @@ def parse_quiz(input_file, output_file):
         if not line:
             continue
             
+        # Detect Section Headers (I., II., etc.)
         if line.startswith(("I. ", "II. ", "III. ", "IV. ", "V. ", "VI. ", "VII. ", "VIII. ")):
-            current_category = line
+            current_section = line
+            # Reset current_q when section changes to prevent bleeding
+            current_q = None
+            # sql_statements.append(f"    -- {current_section}") 
             continue
             
         if line.startswith("Example:"):
@@ -92,7 +65,7 @@ def parse_quiz(input_file, output_file):
             definition = parts[1].strip()
             
             current_q = {
-                "category": current_category,
+                "section": current_section,
                 "title": title,
                 "definition": definition,
                 "example": ""
@@ -110,8 +83,10 @@ def parse_quiz(input_file, output_file):
             q_text += f" (Example: {q['example']})"
             
         q_text = q_text.replace("'", "''")
+        section_text = q['section'].replace("'", "''")
         
-        sql = f"    INSERT INTO assessment_questions (assessment_id, question_number, question_text, response_type, response_options) VALUES (assessment_id_var, {question_number}, '{q_text}', 'likert', '{likert_options}'::jsonb) ON CONFLICT (assessment_id, question_number) DO NOTHING;"
+        # Note: Added 'section' column to INSERT
+        sql = f"    INSERT INTO assessment_questions (assessment_id, question_number, question_text, response_type, response_options, section) VALUES (assessment_id_var, {question_number}, '{q_text}', 'likert', '{likert_options}'::jsonb, '{section_text}') ON CONFLICT (assessment_id, question_number) DO NOTHING;"
         sql_statements.append(sql)
         question_number += 1
 
