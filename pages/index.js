@@ -4,7 +4,17 @@ import { motion } from 'framer-motion';
 // Define the Home component
 import Head from 'next/head';
 
+import PMASlotMachine from '../components/PMASlotMachine';
+
 const Home = () => {
+  const [showWinnerMessage, setShowWinnerMessage] = useState(false);
+  const [pulseButton, setPulseButton] = useState(false);
+
+  const handleJackpotComplete = () => {
+    setShowWinnerMessage(true);
+    setPulseButton(true);
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-50 via-white to-teal-50 p-4">
       <Head>
@@ -28,16 +38,19 @@ const Home = () => {
           </span>
         </h1>
 
-        {/* Taglines */}
-        <div className="mb-8">
-          <motion.p
-            className="text-3xl md:text-4xl font-black bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 bg-clip-text text-transparent drop-shadow-sm"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            Be Awesome @ Today
-          </motion.p>
+        {/* Slot Machine */}
+        <div className="mb-8 transform hover:scale-[1.01] transition-transform duration-500">
+          <PMASlotMachine onJackpotComplete={handleJackpotComplete} />
+
+          {showWinnerMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 p-4 bg-green-100 text-green-800 rounded-xl border border-green-200 shadow-sm"
+            >
+              <p className="font-bold text-lg">✨ Perfect Alignment! You are ready to begin. ✨</p>
+            </motion.div>
+          )}
         </div>
 
         <div className="flex justify-center mt-6 mb-10">
@@ -54,7 +67,7 @@ const Home = () => {
             Your trusted source to help you build a happy life :)
           </p>
           <h2 className="text-3xl md:text-4xl font-extrabold text-gray-700 mt-2 leading-tight">
-            One <span className="text-green-600 font-black">Action</span> at a Time.
+            One <span className="text-green-600 font-black">Positive Mental Action</span> at a Time.
           </h2>
         </div>
       </main>

@@ -174,7 +174,19 @@ export default function PMASlotMachine({ onJackpotComplete }) {
                 </div>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-center justify-center mb-6 relative z-10">
+            {/* Top Display Title */}
+            <div className="bg-gray-800 rounded-t-xl w-full py-3 mb-6 flex justify-center items-center shadow-inner border-b-4 border-gray-700 relative z-20">
+                <div className="px-6 py-2 bg-black rounded-lg border-2 border-gray-600 shadow-[0_0_15px_rgba(0,255,0,0.3)]">
+                    <h2 className="text-2xl md:text-3xl font-black bg-gradient-to-r from-green-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent tracking-widest uppercase font-mono animate-pulse drop-shadow-[0_0_5px_rgba(74,222,128,0.5)]">
+                        BE AWESOME @ TODAY
+                    </h2>
+                </div>
+                {/* Decorative Bolts */}
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-gray-400 shadow-sm"></div>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-gray-400 shadow-sm"></div>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-center justify-center mb-6 relative z-10 px-6">
                 {/* P spins for 1.5s, M spins for 3.0s, A spins for 4.5s */}
                 <SlotColumn key={`p-${key}`} words={pWords} finalWord="Positive" delay={1500} onComplete={handleComplete} columnIndex={0} />
                 <SlotColumn key={`m-${key}`} words={mWords} finalWord="Mental" delay={3000} onComplete={handleComplete} columnIndex={1} />
