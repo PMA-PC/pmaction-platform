@@ -157,7 +157,7 @@ const GoalsPage = () => {
                             <motion.button
                                 key={goal.id}
                                 onClick={() => toggleGoal(goal.id)}
-                                className={`relative p-6 rounded-2xl border-2 transition-all duration-300 text-left ${isSelected
+                                className={`relative p-4 rounded-2xl border-2 transition-all duration-300 text-left ${isSelected
                                     ? 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-500 shadow-lg scale-105'
                                     : 'bg-white border-gray-200 hover:border-teal-300 hover:shadow-md'
                                     }`}
@@ -181,7 +181,7 @@ const GoalsPage = () => {
                                     </motion.div>
                                 )}
 
-                                <div className="text-4xl mb-3">{goal.icon}</div>
+                                <div className="text-5xl mb-3">{goal.icon}</div>
                                 <h3 className="text-lg font-bold text-gray-900 mb-2">{goal.title}</h3>
                                 <p className="text-sm text-gray-600">{goal.description}</p>
                             </motion.button>
