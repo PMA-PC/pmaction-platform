@@ -39,26 +39,18 @@ const Home = () => {
         </h1>
 
         {/* Slot Machine */}
+
+        {/* Slot Machine */}
         <div className="mb-4 transform hover:scale-[1.01] transition-transform duration-500">
           <PMASlotMachine onJackpotComplete={handleJackpotComplete} />
-
-          {showWinnerMessage && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 p-4 bg-green-100 text-green-800 rounded-xl border border-green-200 shadow-sm"
-            >
-              <p className="font-bold text-lg">✨ Perfect Alignment! You are ready to begin. ✨</p>
-            </motion.div>
-          )}
         </div>
 
         <div className="flex justify-center mt-4 mb-6">
           <Link
             href="/onboarding/goals"
-            className="px-10 py-5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-2xl font-black rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 animate-pulse"
+            className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xl md:text-2xl font-black rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 animate-pulse tracking-wide"
           >
-            Start Your Journey ➜
+            Start your free journey to PMAction ➜
           </Link>
         </div>
 
