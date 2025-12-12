@@ -67,7 +67,7 @@ const Home = () => {
             Your trusted source to help you build a happy life :)
           </p>
           <h2 className="text-3xl md:text-4xl font-extrabold text-gray-700 mt-2 leading-tight">
-            One <span className="text-green-600 font-black">Positive Mental Action</span> at a Time.
+            One <span className="bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent font-black">Positive Mental Action</span> at a Time.
           </h2>
         </div>
       </main>
