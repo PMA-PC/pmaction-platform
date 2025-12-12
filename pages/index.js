@@ -31,14 +31,12 @@ const Home = () => {
       </Head>
       <main className="text-center p-6 md:p-10 bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl max-w-4xl w-full border border-white/50">
         {/* Main heading */}
-        <h1 className="text-4xl md:text-5xl font-extrabold text-green-600 mb-2 leading-tight drop-shadow-sm">
+        <h1 className="text-4xl md:text-5xl font-extrabold text-green-600 mb-8 leading-tight drop-shadow-sm">
           Welcome to PMAction.com
           <span className="block text-2xl md:text-3xl mt-2 font-bold text-gray-600">
             Your personalized journey to <span className="text-green-600 font-black">Positive Mental</span> Wellness.
           </span>
         </h1>
-
-        {/* Slot Machine */}
 
         {/* Slot Machine */}
         <div className="mb-4 transform hover:scale-[1.01] transition-transform duration-500">
