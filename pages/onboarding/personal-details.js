@@ -169,8 +169,8 @@ const PersonalDetailsPage = () => {
                                     >
                                         <option value="">Select your age group</option>
                                         <option value="teen">Teen (13-17)</option>
-                                        <option value="young-adult">Young Adult (18-25)</option>
-                                        <option value="adult">Adult (26-54)</option>
+                                        <option value="young-adult">Young Adult (18-29)</option>
+                                        <option value="adult">Adult (30-54)</option>
                                         <option value="55plus">Senior (55+)</option>
                                     </select>
                                     <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
@@ -340,22 +340,25 @@ const PersonalDetailsPage = () => {
                     >
                         <div className="relative w-full max-w-md">
                             <div className="bg-gradient-to-br from-purple-200 via-pink-200 to-teal-200 rounded-3xl p-8 shadow-2xl backdrop-blur-sm">
-                                <div className="text-center mb-6">
-                                    <motion.div
-                                        className="inline-block p-5 bg-white rounded-full shadow-lg mb-4"
-                                        animate={{ rotate: [0, 5, -5, 0] }}
-                                        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                                    >
-                                        <svg className="w-16 h-16 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                    </motion.div>
-                                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Your Data, Your Journey</h3>
-                                    <p className="text-gray-700 font-medium">
-                                        Your mental health journey is completely private. You decide what information to download or share with your therapist. The more detailed your answers and entries, the more personalized the experience.
-                                    </p>
-                                </div>
                                 <div className="space-y-4">
+                                    {/* Privacy Bubble (Moved from header) */}
+                                    <motion.div
+                                        className="flex items-start gap-4 bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-md"
+                                        whileHover={{ scale: 1.05, x: 10 }}
+                                    >
+                                        <div className="w-12 h-12 bg-gradient-to-r from-gray-700 to-gray-900 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg mt-1">
+                                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-900">Your Data, Your Journey</p>
+                                            <p className="text-sm text-gray-600">
+                                                Private and secure. You decide what to share with your therapist.
+                                            </p>
+                                        </div>
+                                    </motion.div>
+
                                     <motion.div
                                         className="flex items-center gap-4 bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-md"
                                         whileHover={{ scale: 1.05, x: 10 }}
