@@ -10,44 +10,19 @@ const aWords = [
     "Action" // Target word
 ];
 
-const SlotColumn = ({ words, finalWord, delay, onComplete, columnIndex }) => {
+const SlotWheel = ({ words, finalWord, delay, onComplete, columnIndex }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isSpinning, setIsSpinning] = useState(true);
-    const [showGlow, setShowGlow] = useState(false);
-    const [showConfetti, setShowConfetti] = useState(false);
 
     useEffect(() => {
-        // Reset state on mount
-        setCurrentIndex(0);
-        setIsSpinning(true);
-        setShowGlow(false);
-        setShowConfetti(false);
-
-        let interval;
-        let timeout;
-
-        // Start spinning
-        interval = setInterval(() => {
+        let interval = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % words.length);
-        }, 80); // Speed of rotation
+        }, 80);
 
-        // Stop spinning after delay
-        timeout = setTimeout(() => {
+        const timeout = setTimeout(() => {
             clearInterval(interval);
             setIsSpinning(false);
-            // Find index of final word
-            const finalIndex = words.indexOf(finalWord);
-            setCurrentIndex(finalIndex !== -1 ? finalIndex : 0);
-
-            // Show glow effect when stopped
-            setShowGlow(true);
-
-            // Show mini confetti for P and M columns
-            if (columnIndex < 2) {
-                setShowConfetti(true);
-                setTimeout(() => setShowConfetti(false), 1800);
-            }
-
+            setCurrentIndex(words.indexOf(finalWord));
             if (onComplete) onComplete();
         }, delay);
 
@@ -55,69 +30,19 @@ const SlotColumn = ({ words, finalWord, delay, onComplete, columnIndex }) => {
             clearInterval(interval);
             clearTimeout(timeout);
         };
-    }, []); // Empty dependency array - only run once on mount
+    }, []);
 
     return (
-        <div className="relative">
-            {/* Mini confetti falling straight down from top of the card */}
-            {showConfetti && (
-                <div className="absolute left-0 right-0 top-0 h-full pointer-events-none overflow-visible z-20">
-                    {[...Array(20)].map((_, i) => (
-                        <motion.div
-                            key={i}
-                            className="absolute w-2 h-2 rounded-full"
-                            style={{
-                                backgroundColor: ['#FF69B4', '#9370DB', '#00CED1', '#FFD700', '#FF6347'][i % 5],
-                                left: `${Math.random() * 100}%`,
-                                top: '-10px'
-                            }}
-                            animate={{
-                                y: [0, 150],
-                                rotate: [0, 360],
-                                opacity: [1, 0.8, 0]
-                            }}
-                            transition={{
-                                duration: 1.2,
-                                ease: "easeIn",
-                                delay: Math.random() * 0.2
-                            }}
-                        />
-                    ))}
-                </div>
-            )}
-
-            <div className={`bg-white border-4 rounded-xl p-4 md:p-6 w-36 md:w-48 h-24 md:h-32 flex items-center justify-center shadow-lg overflow-hidden relative transition-all duration-300 ${showGlow && !isSpinning
-                ? 'border-pink-500 shadow-2xl shadow-pink-500/60 ring-4 ring-purple-400/50'
-                : 'border-pink-400'
-                }`}>
-                <div className="absolute inset-0 bg-gradient-to-b from-gray-100 via-transparent to-gray-100 pointer-events-none z-10"></div>
-                {showGlow && !isSpinning && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 via-pink-400/20 to-blue-400/20 animate-pulse pointer-events-none z-5"></div>
-                )}
-
-                <AnimatePresence mode='wait'>
-                    <motion.div
-                        key={isSpinning ? currentIndex : 'final'}
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{
-                            y: 0,
-                            opacity: 1,
-                            scale: !isSpinning && showGlow ? [1, 1.08, 1] : 1
-                        }}
-                        exit={{ y: -20, opacity: 0 }}
-                        transition={{
-                            duration: 0.1,
-                            scale: { duration: 0.6, repeat: showGlow ? Infinity : 0, repeatDelay: 0.4 }
-                        }}
-                        className={`text-2xl md:text-3xl font-extrabold ${isSpinning
-                            ? 'text-gray-400'
-                            : 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent'
-                            }`}
-                    >
-                        {words[currentIndex]}
-                    </motion.div>
-                </AnimatePresence>
-            </div>
+        <div className="h-24 w-full bg-white border-2 border-gray-300 rounded-lg flex items-center justify-center overflow-hidden shadow-inner relative">
+            <div className="absolute inset-0 bg-gradient-to-b from-gray-200 via-transparent to-gray-200 pointer-events-none z-10 opacity-50"></div>
+            <motion.div
+                key={isSpinning ? currentIndex : 'final'}
+                initial={{ y: 25, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className={`text-xl md:text-2xl font-bold truncate ${isSpinning ? 'text-gray-400 blur-[1px]' : 'text-indigo-600'}`}
+            >
+                {words[currentIndex]}
+            </motion.div>
         </div>
     );
 };
@@ -125,137 +50,82 @@ const SlotColumn = ({ words, finalWord, delay, onComplete, columnIndex }) => {
 export default function PMASlotMachine({ onJackpotComplete }) {
     const [jackpot, setJackpot] = useState(false);
     const [completedCols, setCompletedCols] = useState(0);
-    const [key, setKey] = useState(0); // Key to force remount
-
-    useEffect(() => {
-        // Reset everything on mount
-        setJackpot(false);
-        setCompletedCols(0);
-    }, []);
-
-    // Trigger callback when jackpot animation completes
-    useEffect(() => {
-        if (jackpot && onJackpotComplete) {
-            // Wait for confetti animations to complete (about 3 seconds)
-            const timer = setTimeout(() => {
-                onJackpotComplete();
-            }, 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [jackpot, onJackpotComplete]);
+    const [key, setKey] = useState(0);
 
     const handleComplete = () => {
         setCompletedCols(prev => {
             const newCount = prev + 1;
             if (newCount === 3) {
                 setTimeout(() => setJackpot(true), 100);
+                if (onJackpotComplete) onJackpotComplete();
             }
             return newCount;
         });
     };
 
     return (
-        <div className="flex flex-col items-center py-8 bg-gray-50 rounded-xl my-6 border border-gray-200 shadow-sm relative overflow-hidden">
-            {/* Diagonal watermark text repeated across the background */}
-            <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-                <div className="absolute inset-0 flex flex-col justify-around">
-                    {[...Array(6)].map((_, i) => (
-                        <h2
-                            key={i}
-                            className="text-xl md:text-2xl font-bold text-gray-300 opacity-40 select-none whitespace-nowrap"
-                            style={{
-                                transform: `rotate(-45deg) translateX(${i * 20}px)`,
-                                transformOrigin: 'center'
-                            }}
-                        >
-                            WINNER'S WIN! &nbsp;&nbsp;&nbsp; WINNER'S WIN! &nbsp;&nbsp;&nbsp; WINNER'S WIN! &nbsp;&nbsp;&nbsp; WINNER'S WIN! &nbsp;&nbsp;&nbsp; WINNER'S WIN! &nbsp;&nbsp;&nbsp; WINNER'S WIN!
+        <div className="flex justify-center my-8 scale-90 md:scale-100">
+            {/* Main Machine Body - The "Giant Emoji" Container */}
+            <div className="relative bg-gradient-to-b from-amber-400 to-orange-500 rounded-[2.5rem] p-4 shadow-[0_10px_0px_rgb(180,83,9)] border-4 border-orange-600 w-full max-w-2xl">
+
+                {/* Top Decoration (The "Curve" of the emoji) */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-orange-600 rounded-b-xl opacity-20"></div>
+
+                {/* The "Screen" Interior */}
+                <div className="bg-gray-900 rounded-[2rem] p-6 border-4 border-gray-800 shadow-inner relative overflow-hidden">
+
+                    {/* Screen Glare/Reflection */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+
+                    {/* Title Display IN the screen */}
+                    <div className="mb-6 text-center relative z-10 bg-black/40 rounded-xl py-2 border border-white/10 backdrop-blur-sm">
+                        <h2 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-yellow-300 to-green-400 tracking-widest animate-pulse font-mono" style={{ textShadow: '0 0 10px rgba(74,222,128,0.5)' }}>
+                            BE AWESOME @ TODAY
                         </h2>
-                    ))}
-                </div>
-            </div>
+                    </div>
 
-            {/* Top Display Title */}
-            <div className="bg-gray-800 rounded-t-xl w-full py-3 mb-6 flex justify-center items-center shadow-inner border-b-4 border-gray-700 relative z-20">
-                <div className="px-6 py-2 bg-black rounded-lg border-2 border-gray-600 shadow-[0_0_15px_rgba(0,255,0,0.3)]">
-                    <h2 className="text-2xl md:text-3xl font-black bg-gradient-to-r from-green-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent tracking-widest uppercase font-mono animate-pulse drop-shadow-[0_0_5px_rgba(74,222,128,0.5)]">
-                        BE AWESOME @ TODAY
-                    </h2>
-                </div>
-                {/* Decorative Bolts */}
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-gray-400 shadow-sm"></div>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-gray-400 shadow-sm"></div>
-            </div>
+                    {/* The Reels Container */}
+                    <div className="grid grid-cols-3 gap-3 md:gap-4 bg-gray-800 p-3 rounded-xl border border-gray-700 shadow-inner">
+                        <SlotWheel key={`p-${key}`} words={pWords} finalWord="Positive" delay={1500} onComplete={handleComplete} />
+                        <SlotWheel key={`m-${key}`} words={mWords} finalWord="Mental" delay={3000} onComplete={handleComplete} />
+                        <SlotWheel key={`a-${key}`} words={aWords} finalWord="Action" delay={4500} onComplete={handleComplete} />
+                    </div>
 
-            <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-center justify-center mb-6 relative z-10 px-6">
-                {/* P spins for 1.5s, M spins for 3.0s, A spins for 4.5s */}
-                <SlotColumn key={`p-${key}`} words={pWords} finalWord="Positive" delay={1500} onComplete={handleComplete} columnIndex={0} />
-                <SlotColumn key={`m-${key}`} words={mWords} finalWord="Mental" delay={3000} onComplete={handleComplete} columnIndex={1} />
-                <SlotColumn key={`a-${key}`} words={aWords} finalWord="Action" delay={4500} onComplete={handleComplete} columnIndex={2} />
-            </div>
-
-            {/* Full Confetti Celebration - falling from top across full width */}
-            {jackpot && (
-                <>
-                    {/* Falling confetti from top */}
-                    <div className="fixed inset-0 pointer-events-none z-50">
-                        {[...Array(100)].map((_, i) => (
-                            <motion.div
-                                key={i}
-                                className="absolute w-2 h-2 rounded-full"
-                                style={{
-                                    backgroundColor: ['#FFD700', '#FF6347', '#00CED1', '#FF69B4', '#9370DB', '#32CD32'][i % 6],
-                                    left: `${Math.random() * 100}vw`,
-                                    top: '-20px'
-                                }}
-                                animate={{
-                                    y: ['0vh', '100vh'],
-                                    rotate: [0, 360 * (Math.random() > 0.5 ? 1 : -1)],
-                                    opacity: [1, 1, 0]
-                                }}
-                                transition={{
-                                    duration: 2.5 + Math.random() * 2,
-                                    ease: "linear",
-                                    delay: Math.random() * 1.5
-                                }}
-                            />
+                    {/* Jackpot Lights */}
+                    <div className="flex justify-between mt-4 px-4">
+                        {[...Array(5)].map((_, i) => (
+                            <div key={i} className={`w-3 h-3 rounded-full ${jackpot ? 'bg-yellow-300 animate-ping' : 'bg-red-800'}`}></div>
                         ))}
                     </div>
+                </div>
 
-                    {/* Blast confetti from center of slot machine */}
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none overflow-visible z-50">
-                        {[...Array(60)].map((_, i) => {
-                            const angle = (i / 60) * 360;
-                            const distance = 150 + Math.random() * 250;
-                            const radians = (angle * Math.PI) / 180;
-                            const endX = Math.cos(radians) * distance;
-                            const endY = Math.sin(radians) * distance;
+                {/* Bottom decorative feet/base */}
+                <div className="flex justify-between px-12 mt-2">
+                    <div className="w-16 h-4 bg-black/20 rounded-full blur-sm"></div>
+                    <div className="w-16 h-4 bg-black/20 rounded-full blur-sm"></div>
+                </div>
 
-                            return (
-                                <motion.div
-                                    key={`blast-${i}`}
-                                    className="absolute w-3 h-3 rounded-full"
-                                    style={{
-                                        backgroundColor: ['#FFD700', '#FF6347', '#00CED1', '#FF69B4', '#9370DB', '#32CD32'][i % 6],
-                                        left: '0',
-                                        top: '0'
-                                    }}
-                                    animate={{
-                                        x: [0, endX],
-                                        y: [0, endY],
-                                        rotate: [0, 360 * (Math.random() > 0.5 ? 1 : -1)],
-                                        opacity: [1, 0.8, 0]
-                                    }}
-                                    transition={{
-                                        duration: 1.5 + Math.random() * 0.5,
-                                        ease: "easeOut",
-                                        delay: Math.random() * 0.2
-                                    }}
-                                />
-                            );
-                        })}
-                    </div>
-                </>
+                {/* Lever Handle (Visual Only for Emoji look) */}
+                <div className="absolute top-20 -right-8 w-6 h-32 bg-gray-300 rounded-r-xl border-l-4 border-gray-400 shadow-xl flex flex-col items-center">
+                    <div className="w-8 h-8 bg-red-600 rounded-full -mt-4 shadow-lg border-2 border-red-400"></div>
+                </div>
+            </div>
+
+            {/* Global Confetti (Optional overlay if needed, but keeping it contained is cleaner) */}
+            {jackpot && (
+                <div className="absolute inset-0 pointer-events-none flex justify-center items-center">
+                    {/* Simple centerpiece flair */}
+                    <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: [1, 1.2, 1] }}
+                        className="text-6xl absolute z-50 drop-shadow-2xl"
+                    >
+                        🎉
+                    </motion.div>
+                </div>
             )}
         </div>
     );
 }
+
+
